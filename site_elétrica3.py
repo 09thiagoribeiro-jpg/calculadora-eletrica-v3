@@ -4,7 +4,6 @@ from fpdf import FPDF
 from docx import Document
 from io import BytesIO
 
-# Configuração de página inicial obrigatória do Streamlit
 st.set_page_config(page_title="Gestor Eletrico Pro", layout="wide")
 
 # --- SISTEMA DE SEGURANÇA E SENHA ---
@@ -47,7 +46,6 @@ def gerar_pdf(cliente, obra, responsavel, registro, comodos, circuitos, padrao, 
     pdf.line(10, 47, 200, 47)
     pdf.ln(5)
     
-    # Exibição condicional do Padrão de Entrada no PDF
     if inc_padrao:
         pdf.set_font("Helvetica", "B", 12)
         pdf.cell(190, 8, f"PADRAO DE ENTRADA RECOMENDADO: {padrao['tipo']}", ln=True)
@@ -70,12 +68,10 @@ def gerar_pdf(cliente, obra, responsavel, registro, comodos, circuitos, padrao, 
 def gerar_word(cliente, obra, responsavel, registro, circuitos, padrao, inc_padrao):
     doc = Document()
     doc.add_heading("MEMORIAL DESCRITIVO E LAUDO ELETRICO", level=1)
-    
     p = doc.add_paragraph()
     p.add_run(f"Cliente: {cliente}\nEndereço: {obra}\n").bold = True
     p.add_run(f"Responsável Técnico: {responsavel} | Registro: {registro}\n")
     
-    # Exibição condicional do Padrão de Entrada no Word
     if inc_padrao:
         doc.add_heading("1. Dimensionamento do Padrão de Entrada Geral", level=2)
         doc.add_paragraph(f"Tipo de Atendimento: {padrao['tipo']}\nDisjuntor Geral Sugerido: {padrao['disjuntor']} A\nCabo do Ramal de Entrada: {padrao['cabo']} mm²")
@@ -91,11 +87,10 @@ def gerar_word(cliente, obra, responsavel, registro, circuitos, padrao, inc_padr
     doc.save(target)
     return target.getvalue()
 
-# --- DESIGN DA LOGO PREMIUM ---
 st.markdown("""
     <div style="background-color: #111827; padding: 24px; border-radius: 12px; margin-bottom: 30px; text-align: center; border: 1px solid #1e3a8a;">
         <div style="font-size: 40px; margin-bottom: 5px; text-shadow: 0 0 12px #3b82f6;">⚡</div>
-        <h1 style="margin: 0; font-size: 28px; font-weight: 800; letter-spacing: 2.5px; color: #ffffff;">RIBEIRO ELÉTRICA <span style="color: #3b82f6;">PRO</span></h1>
+        <h1 style="margin: 0; font-size: 28px; font-weight: 800; letter-spacing: 2.5px; color: #ffffff;">PRO ELÉTRICA <span style="color: #3b82f6;">PRO</span></h1>
         <div style="width: 60px; height: 3px; background: linear-gradient(90deg, #1e3a8a, #3b82f6); margin: 12px auto; border-radius: 2px;"></div>
         <p style="margin: 0; color: #9ca3af; font-size: 13px; font-weight: 500; letter-spacing: 1px;">SISTEMA INTELIGENTE DE DIMENSIONAMENTO • NBR 5410</p>
     </div>
@@ -109,21 +104,23 @@ c_prof1, c_prof2 = st.columns(2)
 nome_responsavel = c_prof1.text_input("Responsável Técnico", placeholder="Ex: Eng. Pedro Santos")
 registro_tecnico = c_prof2.text_input("Registro Profissional (CREA / CFT)", placeholder="Ex: 506.XXX-SP")
 
-# --- NOVO SELETOR DE ESCOPO DO SERVIÇO (COM OU SEM PADRÃO) ---
 st.markdown("#### 🛠️ Escopo do Serviço Contratado")
-inclui_padrao_entrada = st.checkbox("Incluir dimensionamento e fornecimento do Padrão de Entrada (Caixa de Medição)", value=True, help="Desmarque esta opção se o cliente já possuir o padrão de entrada pronto e homologado pela concessionária local.")
+inclui_padrao_entrada = st.checkbox("Incluir dimensionamento e fornecimento do Padrão de Entrada (Caixa de Medição)", value=True)
 
 st.markdown("---")
 col_cadastro, col_projeto = st.columns([1.1, 1.4], gap="large")
 
 with col_cadastro:
     st.markdown("### 📝 Cadastrar Novo Cômodo")
-    nome_c = st.text_input("Nome do Cômodo", placeholder="Ex: Suite Master, Cozinha")
-    tipo_c = st.radio("Classificação do Ambiente", ["Área Seca", "Área Úmida/Molhada"])
+    nome_c = st.text_input("Nome do Cômodo", placeholder="Ex: Suite Master, Cozinha, Sala")
+    tipo_c = st.radio("Classificação Base do Ambiente", ["Área Seca (Quartos, Sala)", "Área Úmida/Molhada (Cozinha, Área de Serviço)"])
+    
+    # Nova verificação normativa para o Banheiro Integrado
+    possui_suite = st.checkbox("Este cômodo possui um Banheiro Integrado (Suíte)?", value=False, help="Marque se for uma suíte. O sistema separará automaticamente as tomadas do banheiro (molhada) das tomadas do quarto (seca) conforme item 9.5.3 da NBR 5410.")
     
     c1, c2, c3 = st.columns(3)
-    larg_c = c1.number_input("Largura (m)", min_value=0.1, value=3.0, step=0.1)
-    comp_c = c2.number_input("Comprimento (m)", min_value=0.1, value=4.0, step=0.1)
+    larg_c = c1.number_input("Largura do Quarto (m)", min_value=0.1, value=3.0, step=0.1)
+    comp_c = c2.number_input("Comprimento do Quarto (m)", min_value=0.1, value=4.0, step=0.1)
     dist_c = c3.number_input("Distância ao QGD (m)", min_value=1.0, value=10.0, step=1.0)
         
     tensao_c = st.selectbox("Tensão da Iluminação e Tomadas Gerais (TUGs)", (127, 220))
@@ -131,7 +128,7 @@ with col_cadastro:
     
     st.markdown("#### 🔌 Cargas Especiais / TUEs do Cômodo")
     col_tue_nome, col_tue_w, col_tue_v = st.columns([1.2, 0.9, 0.7])
-    nome_tue = col_tue_nome.text_input("Equipamento", placeholder="Ex: Ar Condicionado")
+    nome_tue = col_tue_nome.text_input("Equipamento", placeholder="Ex: Chuveiro, Ar Cond.")
     w_tue = col_tue_w.number_input("Potência (W)", min_value=0, value=0, step=100)
     v_tue = col_tue_v.selectbox("Tensão (V)", (220, 127), key="tensao_tue_select")
         
@@ -148,7 +145,6 @@ with col_cadastro:
             t_col1.caption(f"• {t['equipamento']}: {t['potencia']}W ({t['tensao']}V)")
             if t_col2.button("❌", key=f"del_tue_temp_{idx}"):
                 tues_para_remover.append(idx)
-        
         if tues_para_remover:
             for index in sorted(tues_para_remover, reverse=True):
                 st.session_state.tues_temporarias.pop(index)
@@ -162,13 +158,27 @@ with col_cadastro:
             per_calc = 2 * (larg_c + comp_c)
             va_ilum = 100 if area_calc < 6 else 100 + (math.floor((area_calc - 6) / 4) * 60)
             
-            q_tugs = math.ceil(per_calc / 3.5) if is_molhada else math.ceil(per_calc / 5)
-            va_tugs = ((3 * 600) + ((q_tugs - 3) * 100) if q_tugs > 3 else q_tugs * 600) if is_molhada else q_tugs * 100
+            # Executa a separação das cargas se for Suíte
+            va_tugs_quarto = 0
+            va_tugs_banheiro = 0
+            
+            if possui_suite:
+                # O quarto vira área seca e calcula TUGs normais
+                q_tugs_q = math.ceil(per_calc / 5)
+                va_tugs_quarto = q_tugs_q * 100
+                # O banheiro gera obrigatoriamente 1 tomada de 600VA separada
+                va_tugs_banheiro = 600
+                is_molhada = False # Base do cômodo principal é o quarto seco
+            else:
+                q_tugs = math.ceil(per_calc / 3.5) if is_molhada else math.ceil(per_calc / 5)
+                va_tugs_quarto = ((3 * 600) + ((q_tugs - 3) * 100) if q_tugs > 3 else q_tugs * 600) if is_molhada else q_tugs * 100
                 
             st.session_state.comodos.append({
                 "nome": nome_c, "molhada": is_molhada, "largura": larg_c, "comprimento": comp_c,
                 "area": area_calc, "perimetro": per_calc, "tensao": tensao_c, "distancia": dist_c,
-                "va_ilum": va_ilum, "q_tugs": q_tugs, "va_tugs": va_tugs, "agrupados": agrup_c, "tues": list(st.session_state.tues_temporarias)
+                "va_ilum": va_ilum, "va_tugs": va_tugs_quarto, "agrupados": agrup_c,
+                "is_suite": possui_suite, "va_banheiro": va_tugs_banheiro,
+                "tues": list(st.session_state.tues_temporarias)
             })
             st.session_state.tues_temporarias = []
             st.rerun()
@@ -185,6 +195,7 @@ with col_projeto:
         circuitos = []
         c_num = 1
         
+        # 1. Iluminação Geral
         for v in (127, 220):
             ilum_comodos = [c for c in st.session_state.comodos if c['tensao'] == v]
             if ilum_comodos:
@@ -194,7 +205,9 @@ with col_projeto:
                 })
                 c_num += 1
         
+        # 2. Tomadas de Áreas Úmidas (Cozinhas, Serviços e BANHEIROS de Suítes)
         for v in (127, 220):
+            # Adiciona cozinhas/serviços normais
             umidas = [c for c in st.session_state.comodos if c['tensao'] == v and c['molhada']]
             for u in umidas:
                 circuitos.append({
@@ -203,7 +216,21 @@ with col_projeto:
                 })
                 c_num += 1
             
-            secas = [c for c in st.session_state.comodos if c['tensao'] == v and not c['molhada']]
+            # BUSCA AUTOMÁTICA DA NBR 5410: Cria circuito molhado separado para o Banheiro da Suíte
+            suites_no_valor = [c for c in st.session_state.comodos if c['tensao'] == v and c['is_suite']]
+            for s in suites_no_valor:
+                circuitos.append({
+                    "numero": c_num, "nome": f"TUG Molhada Banheiro - {s['nome']}", "potencia": s['va_banheiro'],
+                    "tensao": v, "tipo": "TUG", "dr": "OBRIGATORIO (Banheiro)", "distancia": s['distancia'], "agrupados": s['agrupados']
+                })
+                c_num += 1
+            
+            # 3. Tomadas Secas (Quartos normais e a parte do QUARTO da Suíte)
+            secas = [c for c in st.session_state.comodos if c['tensao'] == v and not c['molhada'] and not c['is_suite']]
+            # Junta os quartos normais e a parte seca das suítes no mesmo grupo de agrupamento seguro
+            for s in suites_no_valor:
+                secas.append({"nome": f"Quarto {s['nome']}", "va_tugs": s['va_tugs'], "distancia": s['distancia'], "agrupados": s['agrupados']})
+                
             c_nome, c_va, c_dist, c_agrup = [], 0, 0, 1
             limite = 1200 if v == 127 else 2500
             
@@ -222,6 +249,7 @@ with col_projeto:
                 circuitos.append({"numero": c_num, "nome": f"TUGs Secas Agrupadas ({', '.join(c_nome)})", "potencia": c_va, "tensao": v, "tipo": "TUG", "dr": "RECOMENDADO", "distancia": c_dist, "agrupados": c_agrup})
                 c_num += 1
 
+        # 4. TUEs Individuais
         for c in st.session_state.comodos:
             for t in c['tues']:
                 circuitos.append({
@@ -230,7 +258,7 @@ with col_projeto:
                 })
                 c_num += 1
 
-        # Escopo Opcional: Cálculo do Padrão
+        # Dimensionamento Geral da Entrada
         pot_total_instalada = sum(circ['potencia'] for circ in circuitos)
         pot_com_demanda_w = pot_total_instalada * 0.5
         padrao = {"tipo": "Monofasico (Ate 12kW)", "disjuntor": 40, "cabo": 10.0}
@@ -276,7 +304,9 @@ with col_projeto:
             comodo_remover = None
             for idx, co in enumerate(st.session_state.comodos):
                 with st.expander(f"📍 {co['nome'].upper()}"):
-                    st.write(f"Area: {co['area']:.1f} m2 | Condutores agrupados: {co['agrupados']}")
+                    st.write(f"Area Quarto: {co['area']:.1f} m2 | Eletroduto: {co['agrupados']} circ.")
+                    if co.get('is_suite'):
+                        st.caption("✅ Configuracao Suite Ativa: Cargas do Banheiro separadas automaticamente das cargas do Quarto.")
                     if st.button("Remover Comodo Completo", key=f"del_comodo_{idx}"):
                         comodo_remover = idx
             if comodo_remover is not None:
@@ -286,17 +316,15 @@ with col_projeto:
         with d_aba:
             if inclui_padrao_entrada:
                 st.markdown(f"#### 🏢 Entrada Geral: **{padrao['tipo']}**")
-                st.caption(f"Disjuntor Geral da Caixa: **{padrao['disjuntor']}A** | Bitola Geral do Padrao: **{padrao['cabo']} mm²**")
+                st.caption(f"Disjuntor Geral da Caixa: **{padrao['disjuntor']}A** | Bitola Geral: **{padrao['cabo']} mm²**")
                 st.markdown("---")
-            else:
-                st.info("ℹ️ **Escopo de Serviço:** O Padrão de Entrada Geral (concessionária) foi excluído deste laudo a pedido do contratante.")
             
             for circ in circuitos:
                 st.markdown(f"""
                 <div style="border:1px solid #ddd; padding:12px; border-radius:6px; margin-bottom:10px; background-color:#1e222b;">
                     <h5 style="margin:0; color:#38bdf8;">Circuito {circ['numero']} - {circ['nome']}</h5>
-                    <p style="margin:2px 0; font-size:13px;"><b>Fio dimensionado com Fator Termico:</b> {circ['bitola']} mm² | <b>Disjuntor:</b> {circ['disjuntor']} A</p>
-                    <p style="margin:2px 0; font-size:12px; color:#aaa;">Queda de Tensao: {circ['queda_tensao']:.2f}% | Condutores no mesmo duto: {circ['agrupados']}</p>
+                    <p style="margin:2px 0; font-size:13px;"><b>Fio Final (Fator Termico):</b> {circ['bitola']} mm² | <b>Disjuntor DIN:</b> {circ['disjuntor']} A</p>
+                    <p style="margin:2px 0; font-size:12px; color:#aaa;">Queda de Tensao: {circ['queda_tensao']:.2f}% | DR: {circ['dr']}</p>
                 </div>
                 """, unsafe_allow_html=True)
                 
@@ -312,7 +340,7 @@ with col_projeto:
                     st.write(f"• Cabo Flexivel {bit} mm²: **{metros:.1f} metros**")
 
         st.markdown("---")
-        st.markdown("#### 📂 Exportação da Documentação da Obra")
+        st.markdown("#### 📂 Exportacao da Documentacao da Obra")
         c_down1, c_down2 = st.columns(2)
         with c_down1:
             dados_pdf = gerar_pdf(nome_cliente, endereco_obra, nome_responsavel, registro_tecnico, st.session_state.comodos, circuitos, padrao, inclui_padrao_entrada)
