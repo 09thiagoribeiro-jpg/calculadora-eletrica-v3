@@ -66,7 +66,6 @@ def gerar_pdf(cliente, obra, responsavel, registro, comodos, circuitos):
         pdf.ln(1)
     return pdf.output()
 
-# --- DESIGN E ESTÉTICA DA LOGO ---
 st.markdown("""
     <div style="background: linear-gradient(135deg, #1e3a8a, #3b82f6); padding: 20px; border-radius: 12px; margin-bottom: 25px; text-align: center; color: white;">
         <h1 style="margin: 0; font-size: 32px;">⚡ PRO ELETRICA & ENGENHARIA</h1>
@@ -97,20 +96,31 @@ with col_cadastro:
         
     tensao_c = st.selectbox("Tensão da Iluminação e Tomadas Gerais (TUGs)", (127, 220))
     
-    st.markdown("#### 🔌 Adicionar TUEs deste Cômodo (Tensões Independentes)")
+    st.markdown("#### 🔌 Cargas Especiais / TUEs do Cômodo")
     col_tue_nome, col_tue_w, col_tue_v = st.columns([1.2, 0.9, 0.7])
     nome_tue = col_tue_nome.text_input("Equipamento", placeholder="Ex: Ar Condicionado")
     w_tue = col_tue_w.number_input("Potência (W)", min_value=0, value=0, step=100)
     v_tue = col_tue_v.selectbox("Tensão (V)", (220, 127), key="tensao_tue_select")
         
-    if st.button("➕ Vincular TUE ao Cômodo"):
+    if st.button("➕ Vincular TUE"):
         if nome_tue and w_tue > 0:
             st.session_state.tues_temporarias.append({"equipamento": nome_tue, "potencia": w_tue, "tensao": v_tue})
-            st.toast(f"TUE '{nome_tue}' vinculada em {v_tue}V.")
+            st.toast(f"TUE '{nome_tue}' vinculada.")
             
+    # Gerenciador de Remoção de TUEs individuais
     if st.session_state.tues_temporarias:
-        for t in st.session_state.tues_temporarias:
-            st.caption(f"• {t['equipamento']}: {t['potencia']}W em {t['tensao']}V")
+        st.write("**TUEs vinculadas provisoriamente:**")
+        tues_para_remover = []
+        for idx, t in enumerate(st.session_state.tues_temporarias):
+            t_col1, t_col2 = st.columns([4, 1])
+            t_col1.caption(f"• {t['equipamento']}: {t['potencia']}W ({t['tensao']}V)")
+            if t_col2.button("❌", key=f"del_tue_temp_{idx}"):
+                tues_para_remover.append(idx)
+        
+        if tues_para_remover:
+            for index in sorted(tues_para_remover, reverse=True):
+                st.session_state.tues_temporarias.pop(index)
+            st.rerun()
             
     st.markdown("---")
     if st.button("💾 SALVAR CÔMODO NO PROJETO", type="primary"):
@@ -120,12 +130,8 @@ with col_cadastro:
             per_calc = 2 * (larg_c + comp_c)
             va_ilum = 100 if area_calc < 6 else 100 + (math.floor((area_calc - 6) / 4) * 60)
             
-            if not is_molhada:
-                q_tugs = math.ceil(per_calc / 5)
-                va_tugs = q_tugs * 100
-            else:
-                q_tugs = math.ceil(per_calc / 3.5)
-                va_tugs = (3 * 600) + ((q_tugs - 3) * 100) if q_tugs > 3 else q_tugs * 600
+            q_tugs = math.ceil(per_calc / 3.5) if is_molhada else math.ceil(per_calc / 5)
+            va_tugs = ((3 * 600) + ((q_tugs - 3) * 100) if q_tugs > 3 else q_tugs * 600) if is_molhada else q_tugs * 100
                 
             st.session_state.comodos.append({
                 "nome": nome_c, "molhada": is_molhada, "largura": larg_c, "comprimento": comp_c,
@@ -135,12 +141,12 @@ with col_cadastro:
             st.session_state.tues_temporarias = []
             st.rerun()
 
-    if st.button("🗑️ Limpar Projeto"):
+    if st.button("🗑️ Limpar Todo o Projeto"):
         st.session_state.comodos = []
         st.session_state.tues_temporarias = []
         st.rerun()
 with col_projeto:
-    st.markdown("### 📋 Quadro de Distribuição & Lista de Materiais")
+    st.markdown("### 📋 Quadro de Distribuição & Edição")
     if not st.session_state.comodos:
         st.info("Nenhum cômodo cadastrado.")
     else:
@@ -184,7 +190,6 @@ with col_projeto:
                 circuitos.append({"numero": c_num, "nome": f"TUGs Secas Agrupadas ({', '.join(c_nome)})", "potencia": c_va, "tensao": v, "tipo": "TUG", "dr": "RECOMENDADO", "distancia": c_dist})
                 c_num += 1
 
-        # Processamento das TUEs com a tensão individual escolhida
         for c in st.session_state.comodos:
             for t in c['tues']:
                 circuitos.append({
@@ -193,7 +198,6 @@ with col_projeto:
                 })
                 c_num += 1
 
-        # Dicionários para o Resumo quantitativo de Materiais
         resumo_disjuntores = {}
         resumo_cabos = {1.5: 0.0, 2.5: 0.0, 4.0: 0.0, 6.0: 0.0, 10.0: 0.0}
 
@@ -221,19 +225,39 @@ with col_projeto:
             dj_adequado = 10 if i_proj <= 10 else 16 if i_proj <= 16 else 20 if i_proj <= 20 else 25 if i_proj <= 25 else 32 if i_proj <= 32 else 40
             circ['disjuntor'] = dj_adequado
             
-            # Alimenta o resumo de materiais (considerando Fase + Neutro/Fase + Terra para o comprimento linear)
             resumo_disjuntores[dj_adequado] = resumo_disjuntores.get(dj_adequado, 0) + 1
             resumo_cabos[circ['bitola']] += circ['distancia'] * 3.0
 
-        v_aba, d_aba, mat_aba = st.tabs(["🏠 Comodos", "🗂️ QGD (Circuitos)", "📦 Resumo de Materiais"])
+        v_aba, d_aba, mat_aba = st.tabs(["🏠 Gerenciar Comodos", "🗂️ QGD (Circuitos)", "📦 Materiais"])
         
         with v_aba:
-            for co in st.session_state.comodos:
+            comodo_remover = None
+            for idx, co in enumerate(st.session_state.comodos):
                 with st.expander(f"📍 {co['nome'].upper()}"):
-                    st.write(f"Area Base: {co['area']:.1f} m2 | Tensao Tomadas/Ilum: {co['tensao']}V")
+                    st.write(f"Area: {co['area']:.1f} m2 | Distancia: {co['distancia']}m")
+                    
+                    # Gerenciador de TUEs dentro do cômodo já salvo
                     if co['tues']:
-                        for t in co['tues']:
-                            st.caption(f"🔸 TUE Vinc.: {t['equipamento']} ({t['potencia']}W em {t['tensao']}V)")
+                        st.write("Cargas Especiais (TUEs):")
+                        tues_internas_para_remover = []
+                        for t_idx, t in enumerate(co['tues']):
+                            t_col1, t_col2 = st.columns([5, 1])
+                            t_col1.write(f"🔸 {t['equipamento']} ({t['potencia']}W em {t['tensao']}V)")
+                            if t_col2.button("🗑️", key=f"del_tue_salva_{idx}_{t_idx}"):
+                                tues_internas_para_remover.append(t_idx)
+                        
+                        if tues_internas_para_remover:
+                            for t_index in tues_internas_para_remover:
+                                co['tues'].pop(t_index)
+                            st.rerun()
+                    
+                    # Botão para excluir o cômodo inteiro
+                    if st.button("Remover Comodo Completo", key=f"del_comodo_{idx}"):
+                        comodo_remover = idx
+            
+            if comodo_remover is not None:
+                st.session_state.comodos.pop(comodo_remover)
+                st.rerun()
 
         with d_aba:
             for circ in circuitos:
@@ -241,23 +265,18 @@ with col_projeto:
                 <div style="border:1px solid #ddd; padding:12px; border-radius:6px; margin-bottom:10px; background-color:#1e222b;">
                     <h5 style="margin:0; color:#38bdf8;">Circuito {circ['numero']} - {circ['nome']}</h5>
                     <p style="margin:2px 0; font-size:13px;"><b>Tensao:</b> {circ['tensao']}V | <b>Carga:</b> {circ['potencia']:.0f} VA | <b>Queda:</b> {circ['queda_tensao']:.2f}%</p>
-                    <p style="margin:2px 0; color:#4ade80; font-size:13px;">🔹 <b>Fio:</b> {circ['bitola']} mm² &nbsp;&nbsp;&nbsp;&nbsp; 🔹 <b>Disjuntor DIN:</b> {circ['disjuntor']} A</p>
+                    <p style="margin:2px 0; color:#4ade80; font-size:13px;">🔹 <b>Fio:</b> {circ['bitola']} mm² &nbsp;&nbsp;&nbsp;&nbsp; 🔹 <b>Disjuntor:</b> {circ['disjuntor']} A</p>
                 </div>
                 """, unsafe_allow_html=True)
                 
         with mat_aba:
-            st.markdown("#### 🛒 Estimativa Quantitativa Básica para Compra")
-            st.write("Valores aproximados com base nas distâncias informadas ao quadro (incluindo margem de cabo para passagem):")
-            
-            st.markdown("**Disjuntores Termomagnéticos DIN:**")
+            st.markdown("#### 🛒 Estimativa Quantitativa")
             for amp, quant in resumo_disjuntores.items():
-                st.write(f"• Disjuntor Monofásico/Bifásico {amp}A: **{quant} un.**")
-                
-            st.markdown("**Condutores de Cobre Flexível (Metragem Total Estimada):**")
+                st.write(f"• Disjuntor {amp}A: **{quant} un.**")
             for bit, metros in resumo_cabos.items():
                 if metros > 0:
-                    st.write(f"• Cabo {bit} mm²: **{metros:.1f} metros** (Total somando condutores do circuito)")
+                    st.write(f"• Cabo {bit} mm²: **{metros:.1f} metros**")
 
         st.markdown("---")
         dados_pdf = gerar_pdf(nome_cliente, endereco_obra, nome_responsavel, registro_tecnico, st.session_state.comodos, circuitos)
-        st.download_button(label="📥 DOWNLOAD LAUDO CORPORATIVO (PDF)", data=bytes(dados_pdf), file_name="laudo_pro_nbr5410.pdf", mime="application/pdf")
+        st.download_button(label="📥 DOWNLOAD LAUDO EM PDF", data=bytes(dados_pdf), file_name="laudo_eletrico.pdf", mime="application/pdf")
