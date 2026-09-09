@@ -119,7 +119,7 @@ with col_cadastro:
     dist_c = c3.number_input("Distância ao QGD (m)", min_value=1.0, value=10.0, step=1.0)
         
     tensao_c = st.selectbox("Tensão da Iluminação e Tomadas Gerais (TUGs)", (127, 220))
-    agrup_c = st.number_input("Circuitos Agrupados no Eletroduto", min_value=1, value=2, step=1, help="Quantidade de circuitos que vão passar pelo mesmo eletroduto deste cômodo (Fator de Agrupamento da NBR 5410).")
+    agrup_c = st.number_input("Circuitos Agrupados no Eletroduto", min_value=1, value=2, step=1, help="Quantidade de circuitos que passam pelo mesmo eletroduto.")
     
     st.markdown("#### 🔌 Cargas Especiais / TUEs do Cômodo")
     col_tue_nome, col_tue_w, col_tue_v = st.columns([1.2, 0.9, 0.7])
@@ -136,7 +136,8 @@ with col_cadastro:
         st.write("**TUEs vinculadas provisoriamente:**")
         tues_para_remover = []
         for idx, t in enumerate(st.session_state.tues_temporarias):
-            t_col1, t_col2 = st.columns()
+            # FIX: st.columns(2) corrigido para evitar o travamento visual
+            t_col1, t_col2 = st.columns(2)
             t_col1.caption(f"• {t['equipamento']}: {t['potencia']}W ({t['tensao']}V)")
             if t_col2.button("❌", key=f"del_tue_temp_{idx}"):
                 tues_para_remover.append(idx)
@@ -177,7 +178,6 @@ with col_projeto:
         circuitos = []
         c_num = 1
         
-        # 1. Iluminação Geral
         for v in (127, 220):
             ilum_comodos = [c for c in st.session_state.comodos if c['tensao'] == v]
             if ilum_comodos:
@@ -187,7 +187,6 @@ with col_projeto:
                 })
                 c_num += 1
         
-        # 2. Tomadas Gerais (TUGs)
         for v in (127, 220):
             umidas = [c for c in st.session_state.comodos if c['tensao'] == v and c['molhada']]
             for u in umidas:
@@ -216,7 +215,6 @@ with col_projeto:
                 circuitos.append({"numero": c_num, "nome": f"TUGs Secas Agrupadas ({', '.join(c_nome)})", "potencia": c_va, "tensao": v, "tipo": "TUG", "dr": "RECOMENDADO", "distancia": c_dist, "agrupados": c_agrup})
                 c_num += 1
 
-        # 3. TUEs Individuais
         for c in st.session_state.comodos:
             for t in c['tues']:
                 circuitos.append({
@@ -225,9 +223,7 @@ with col_projeto:
                 })
                 c_num += 1
 
-        # --- CÁLCULO DE PADRÃO DE ENTRADA GERAL DA EDIFICAÇÃO ---
         pot_total_instalada = sum(circ['potencia'] for circ in circuitos)
-        # Aplicação simplificada do fator de demanda normativo médio (0.5) para dimensionamento de entrada
         pot_com_demanda_w = pot_total_instalada * 0.5
         
         padrao = {"tipo": "Monofasico (Ate 12kW)", "disjuntor": 40, "cabo": 10.0}
@@ -239,19 +235,14 @@ with col_projeto:
         resumo_disjuntores = {}
         resumo_cabos = {1.5: 0.0, 2.5: 0.0, 4.0: 0.0, 6.0: 0.0, 10.0: 0.0}
 
-        # --- ENGENHARIA DE PROJEÇÃO TÉRMICA (AGRUPAMENTO E QUEDA) ---
         for circ in circuitos:
             circ['corrente'] = circ['potencia'] / circ['tensao']
-            
-            # Tabela 42 NBR 5410: Fatores de agrupamento para condutores em eletrodutos
             f_agrup = 1.0 if circ['agrupados'] == 1 else 0.80 if circ['agrupados'] == 2 else 0.70 if circ['agrupados'] == 3 else 0.65
             b_final = 1.5 if circ['tipo'] == "ILUM" else 2.5
             
             while True:
                 cap_base = 17.5 if b_final==1.5 else 24.0 if b_final==2.5 else 32.0 if b_final==4.0 else 41.0 if b_final==6.0 else 57.0
-                # Aplicação rigorosa do Fator Térmico de Agrupamento
                 cap_corrigida = cap_base * f_agrup
-                
                 q_v = (2.0 * 0.0178 * circ['distancia'] * circ['corrente']) / b_final
                 pct = (q_v / circ['tensao']) * 100.0
                 
@@ -268,7 +259,6 @@ with col_projeto:
 
             dj_adequado = 10 if circ['corrente']<=10 else 16 if circ['corrente']<=16 else 20 if circ['corrente']<=20 else 25 if circ['corrente']<=25 else 32 if circ['corrente']<=32 else 40
             circ['disjuntor'] = dj_adequado
-            
             resumo_disjuntores[dj_adequado] = resumo_disjuntores.get(dj_adequado, 0) + 1
             resumo_cabos[circ['bitola']] += circ['distancia'] * 3.0
 
@@ -278,7 +268,23 @@ with col_projeto:
             comodo_remover = None
             for idx, co in enumerate(st.session_state.comodos):
                 with st.expander(f"📍 {co['nome'].upper()}"):
-                    st.write(f"Area: {co['area']:.1f} m2 | Condutores agrupados neste ramal: {co['agrupados']}")
+                    st.write(f"Area: {co['area']:.1f} m2 | Condutores agrupados: {co['agrupados']}")
+                    
+                    if co['tues']:
+                        st.write("Cargas Especiais (TUEs) Ativas:")
+                        tues_internas_para_remover = []
+                        for t_idx, t in enumerate(co['tues']):
+                            # FIX: st.columns(2) adicionado para evitar travamento interno na exclusao
+                            t_col1, t_col2 = st.columns(2)
+                            t_col1.write(f"🔸 {t['equipamento']} ({t['potencia']}W em {t['tensao']}V)")
+                            if t_col2.button("🗑️", key=f"del_tue_salva_{idx}_{t_idx}"):
+                                tues_internas_para_remover.append(t_idx)
+                        
+                        if tues_internas_para_remover:
+                            for t_index in tues_internas_para_remover:
+                                co['tues'].pop(t_index)
+                            st.rerun()
+                            
                     if st.button("Remover Comodo Completo", key=f"del_comodo_{idx}"):
                         comodo_remover = idx
             if comodo_remover is not None:
@@ -287,26 +293,26 @@ with col_projeto:
 
         with d_aba:
             st.markdown(f"#### 🏢 Entrada Geral: **{padrao['tipo']}**")
-            st.caption(f"Disjuntor Geral da Caixa: **{padrao['disjuntor']}A** | Bitola Geral do Padrão: **{padrao['cabo']} mm²**")
+            st.caption(f"Disjuntor Geral da Caixa: **{padrao['disjuntor']}A** | Bitola Geral do Padrao: **{padrao['cabo']} mm²**")
             st.markdown("---")
             for circ in circuitos:
                 st.markdown(f"""
                 <div style="border:1px solid #ddd; padding:12px; border-radius:6px; margin-bottom:10px; background-color:#1e222b;">
                     <h5 style="margin:0; color:#38bdf8;">Circuito {circ['numero']} - {circ['nome']}</h5>
-                    <p style="margin:2px 0; font-size:13px;"><b>Fio dimensionado com Fator Térmico:</b> {circ['bitola']} mm² | <b>Disjuntor:</b> {circ['disjuntor']} A</p>
-                    <p style="margin:2px 0; font-size:12px; color:#aaa;">Queda de Tensão: {circ['queda_tensao']:.2f}% | Condutores no mesmo duto: {circ['agrupados']}</p>
+                    <p style="margin:2px 0; font-size:13px;"><b>Fio dimensionado com Fator Termico:</b> {circ['bitola']} mm² | <b>Disjuntor:</b> {circ['disjuntor']} A</p>
+                    <p style="margin:2px 0; font-size:12px; color:#aaa;">Queda de Tensao: {circ['queda_tensao']:.2f}% | Condutores no mesmo duto: {circ['agrupados']}</p>
                 </div>
                 """, unsafe_allow_html=True)
                 
         with mat_aba:
             st.markdown("#### 🛒 Lista de Compras Estimada")
-            st.write(f"• Cabo de Cobre do Padrão ({padrao['cabo']} mm²): **15.0 metros**")
-            st.write(f"• Disjuntor Geral do Padrão {padrao['disjuntor']}A: **1 un.**")
+            st.write(f"• Cabo de Cobre do Padrao ({padrao['cabo']} mm²): **15.0 metros**")
+            st.write(f"• Disjuntor Geral do Padrao {padrao['disjuntor']}A: **1 un.**")
             for amp, quant in resumo_disjuntores.items():
-                st.write(f"• Disjuntor Termomagnético DIN {amp}A: **{quant} un.**")
+                st.write(f"• Disjuntor Termomagnetico DIN {amp}A: **{quant} un.**")
             for bit, metros in resumo_cabos.items():
                 if metros > 0:
-                    st.write(f"• Cabo Flexível {bit} mm²: **{metros:.1f} metros**")
+                    st.write(f"• Cabo Flexivel {bit} mm²: **{metros:.1f} metros**")
 
         st.markdown("---")
         st.markdown("#### 📂 Exportação da Documentação da Obra")
@@ -318,4 +324,3 @@ with col_projeto:
         with c_down2:
             dados_word = gerar_word(nome_cliente, endereco_obra, nome_responsavel, registro_tecnico, circuitos, padrao)
             st.download_button(label="📝 BAIXAR MEMORIAL EM WORD (.DOCX)", data=dados_word, file_name="memorial_descritivo.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
-
