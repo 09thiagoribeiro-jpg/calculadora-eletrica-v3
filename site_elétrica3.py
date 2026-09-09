@@ -1,6 +1,35 @@
 import math
 import streamlit as st
 from fpdf import FPDF
+# ==========================================
+# COLOQUE AQUI: SISTEMA DE SENHA BLOQUEADOR
+# ==========================================
+if "autenticado" not in st.session_state:
+    st.session_state.autenticado = False
+
+if not st.session_state.autenticado:
+    st.title("⚡ Gestor de Projetos Elétricos Avançado")
+    st.markdown("### 🔒 Acesso Restrito")
+    senha = st.text_input("Digite a senha para acessar o Gestor:", type="password")
+    if st.button("Entrar"):
+        # VOCÊ PODE MUDAR A PALAVRA 'mudar123' PARA A SENHA QUE VOCÊ QUISER:
+        if senha == "mudar123":  
+            st.session_state.autenticado = True
+            st.rerun()
+        else:
+            st.error("Senha incorreta!")
+    st.stop() # Trava o resto do site aqui se não estiver autenticado
+
+# ==========================================
+# CONTINUAÇÃO DO CÓDIGO (Deixe como está)
+# ==========================================
+st.set_page_config(page_title="Gestor NBR 5410", layout="wide")
+
+if "comodos" not in st.session_state:
+    st.session_state.comodos = []
+if "tues_temporarias" not in st.session_state:
+# ... resto do código continua igual até o fim
+
 
 st.set_page_config(page_title="Gestor NBR 5410", layout="wide")
 
