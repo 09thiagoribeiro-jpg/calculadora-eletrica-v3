@@ -114,24 +114,79 @@ with col_cadastro:
     st.markdown("### 📝 Cadastrar Novo Cômodo")
     nome_c = st.text_input("Nome do Cômodo", placeholder="Ex: Suite Master, Cozinha, Sala")
     tipo_c = st.radio("Classificação Base do Ambiente", ["Área Seca (Quartos, Sala)", "Área Úmida/Molhada (Cozinha, Área de Serviço)"])
-    
-    # Nova verificação normativa para o Banheiro Integrado
-    possui_suite = st.checkbox("Este cômodo possui um Banheiro Integrado (Suíte)?", value=False, help="Marque se for uma suíte. O sistema separará automaticamente as tomadas do banheiro (molhada) das tomadas do quarto (seca) conforme item 9.5.3 da NBR 5410.")
+    possui_suite = st.checkbox("Este cômodo possui um Banheiro Integrado (Suíte)?", value=False)
     
     c1, c2, c3 = st.columns(3)
-    larg_c = c1.number_input("Largura do Quarto (m)", min_value=0.1, value=3.0, step=0.1)
-    comp_c = c2.number_input("Comprimento do Quarto (m)", min_value=0.1, value=4.0, step=0.1)
+    larg_c = c1.number_input("Largura (m)", min_value=0.1, value=3.0, step=0.1)
+    comp_c = c2.number_input("Comprimento (m)", min_value=0.1, value=4.0, step=0.1)
     dist_c = c3.number_input("Distância ao QGD (m)", min_value=1.0, value=10.0, step=1.0)
         
     tensao_c = st.selectbox("Tensão da Iluminação e Tomadas Gerais (TUGs)", (127, 220))
     agrup_c = st.number_input("Circuitos Agrupados no Eletroduto", min_value=1, value=2, step=1)
     
+    # --- NOVO BANCO DE DADOS DE TUES TÍPICAS ---
     st.markdown("#### 🔌 Cargas Especiais / TUEs do Cômodo")
-    col_tue_nome, col_tue_w, col_tue_v = st.columns([1.2, 0.9, 0.7])
-    nome_tue = col_tue_nome.text_input("Equipamento", placeholder="Ex: Chuveiro, Ar Cond.")
-    w_tue = col_tue_w.number_input("Potência (W)", min_value=0, value=0, step=100)
-    v_tue = col_tue_v.selectbox("Tensão (V)", (220, 127), key="tensao_tue_select")
-        
+    
+    equip_sugestao = st.selectbox(
+        "Selecione o Equipamento Típico:",
+        [
+            "Nenhum / Selecione...",
+            "Chuveiro Elétrico",
+            "Ar Condicionado",
+            "Lava e Seca",
+            "Forno Elétrico",
+            "Micro-ondas Grande",
+            "Torneira Elétrica",
+            "Outro (Digitar Manualmente)"
+        ]
+    )
+    
+    # Define as potências e tensões comerciais com base na seleção
+    opcoes_potencia = [0]
+    tensao_sugerida = 220
+    mostrar_manual = False
+    
+    if equip_sugestao == "Chuveiro Elétrico":
+        opcoes_potencia = [4400, 5500, 6800, 7500]
+        tensao_sugerida = 220
+    elif equip_sugestao == "Ar Condicionado":
+        opcoes_potencia = [900, 1200, 1600, 2200] # Equivalentes aproximados em W para 9k, 12k, 18k e 24k BTUs
+        tensao_sugerida = 220
+    elif equip_sugestao == "Lava e Seca":
+        opcoes_potencia = [2000, 2500, 3000]
+        tensao_sugerida = 127
+    elif equip_sugestao == "Forno Elétrico":
+        opcoes_potencia = [1500, 2200, 3500]
+        tensao_sugerida = 220
+    elif equip_sugestao == "Micro-ondas Grande":
+        opcoes_potencia = [1200, 1500, 1800]
+        tensao_sugerida = 127
+    elif equip_sugestao == "Torneira Elétrica":
+        opcoes_potencia = [3500, 4500, 5500]
+        tensao_sugerida = 220
+    elif equip_sugestao == "Outro (Digitar Manualmente)":
+        mostrar_manual = True
+
+    col_tue_final, col_tue_v = st.columns([1.5, 0.7])
+    
+    with col_tue_final:
+        if mostrar_manual:
+            nome_tue = st.text_input("Nome Customizado:", placeholder="Ex: Hidromassagem")
+            w_tue = st.number_input("Potência Customizada (W):", min_value=0, value=0, step=100)
+        elif equip_sugestao != "Nenhum / Selecione...":
+            nome_tue = equip_sugestao
+            w_tue = st.selectbox("Escolha a Potência Comercial (W):", opcoes_potencia)
+        else:
+            nome_tue = ""
+            w_tue = 0
+            
+    with col_tue_v:
+        if equip_sugestao != "Nenhum / Selecione...":
+            idx_v = 0 if tensao_sugerida == 220 else 1
+            v_tue = st.selectbox("Tensão da TUE (V)", (220, 127), index=idx_v, key="tensao_tue_select")
+        else:
+            v_tue = 220
+
     if st.button("➕ Vincular TUE"):
         if nome_tue and w_tue > 0:
             st.session_state.tues_temporarias.append({"equipamento": nome_tue, "potencia": w_tue, "tensao": v_tue})
@@ -158,17 +213,14 @@ with col_cadastro:
             per_calc = 2 * (larg_c + comp_c)
             va_ilum = 100 if area_calc < 6 else 100 + (math.floor((area_calc - 6) / 4) * 60)
             
-            # Executa a separação das cargas se for Suíte
             va_tugs_quarto = 0
             va_tugs_banheiro = 0
             
             if possui_suite:
-                # O quarto vira área seca e calcula TUGs normais
                 q_tugs_q = math.ceil(per_calc / 5)
                 va_tugs_quarto = q_tugs_q * 100
-                # O banheiro gera obrigatoriamente 1 tomada de 600VA separada
                 va_tugs_banheiro = 600
-                is_molhada = False # Base do cômodo principal é o quarto seco
+                is_molhada = False
             else:
                 q_tugs = math.ceil(per_calc / 3.5) if is_molhada else math.ceil(per_calc / 5)
                 va_tugs_quarto = ((3 * 600) + ((q_tugs - 3) * 100) if q_tugs > 3 else q_tugs * 600) if is_molhada else q_tugs * 100
@@ -195,7 +247,6 @@ with col_projeto:
         circuitos = []
         c_num = 1
         
-        # 1. Iluminação Geral
         for v in (127, 220):
             ilum_comodos = [c for c in st.session_state.comodos if c['tensao'] == v]
             if ilum_comodos:
@@ -205,9 +256,7 @@ with col_projeto:
                 })
                 c_num += 1
         
-        # 2. Tomadas de Áreas Úmidas (Cozinhas, Serviços e BANHEIROS de Suítes)
         for v in (127, 220):
-            # Adiciona cozinhas/serviços normais
             umidas = [c for c in st.session_state.comodos if c['tensao'] == v and c['molhada']]
             for u in umidas:
                 circuitos.append({
@@ -216,7 +265,6 @@ with col_projeto:
                 })
                 c_num += 1
             
-            # BUSCA AUTOMÁTICA DA NBR 5410: Cria circuito molhado separado para o Banheiro da Suíte
             suites_no_valor = [c for c in st.session_state.comodos if c['tensao'] == v and c['is_suite']]
             for s in suites_no_valor:
                 circuitos.append({
@@ -225,9 +273,7 @@ with col_projeto:
                 })
                 c_num += 1
             
-            # 3. Tomadas Secas (Quartos normais e a parte do QUARTO da Suíte)
             secas = [c for c in st.session_state.comodos if c['tensao'] == v and not c['molhada'] and not c['is_suite']]
-            # Junta os quartos normais e a parte seca das suítes no mesmo grupo de agrupamento seguro
             for s in suites_no_valor:
                 secas.append({"nome": f"Quarto {s['nome']}", "va_tugs": s['va_tugs'], "distancia": s['distancia'], "agrupados": s['agrupados']})
                 
@@ -249,7 +295,6 @@ with col_projeto:
                 circuitos.append({"numero": c_num, "nome": f"TUGs Secas Agrupadas ({', '.join(c_nome)})", "potencia": c_va, "tensao": v, "tipo": "TUG", "dr": "RECOMENDADO", "distancia": c_dist, "agrupados": c_agrup})
                 c_num += 1
 
-        # 4. TUEs Individuais
         for c in st.session_state.comodos:
             for t in c['tues']:
                 circuitos.append({
@@ -258,7 +303,6 @@ with col_projeto:
                 })
                 c_num += 1
 
-        # Dimensionamento Geral da Entrada
         pot_total_instalada = sum(circ['potencia'] for circ in circuitos)
         pot_com_demanda_w = pot_total_instalada * 0.5
         padrao = {"tipo": "Monofasico (Ate 12kW)", "disjuntor": 40, "cabo": 10.0}
@@ -304,7 +348,7 @@ with col_projeto:
             comodo_remover = None
             for idx, co in enumerate(st.session_state.comodos):
                 with st.expander(f"📍 {co['nome'].upper()}"):
-                    st.write(f"Area Quarto: {co['area']:.1f} m2 | Eletroduto: {co['agrupados']} circ.")
+                    st.write(f"Area: {co['area']:.1f} m2 | Condutores agrupados: {co['agrupados']}")
                     if co.get('is_suite'):
                         st.caption("✅ Configuracao Suite Ativa: Cargas do Banheiro separadas automaticamente das cargas do Quarto.")
                     if st.button("Remover Comodo Completo", key=f"del_comodo_{idx}"):
