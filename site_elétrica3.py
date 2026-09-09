@@ -2,8 +2,7 @@ import math
 import streamlit as st
 from fpdf import FPDF
 
-# A NBR 5410 exige que a configuração da página seja a PRIMEIRA linha executável do site:
-st.set_page_config(page_title="Gestor NBR 5410", layout="wide")
+st.set_page_config(page_title="Gestor Eletrico Pro", layout="wide")
 
 # --- SISTEMA DE SEGURANÇA E SENHA ---
 if "autenticado" not in st.session_state:
@@ -14,21 +13,20 @@ if not st.session_state.autenticado:
     st.markdown("### 🔒 Acesso Restrito")
     senha = st.text_input("Digite a senha para acessar o Gestor:", type="password")
     if st.button("Entrar"):
-        # VOCÊ PODE ALTERAR O TEXTO "mudar123" PARA A SENHA QUE VOCÊ QUISER:
         if senha == "mudar123":  
             st.session_state.autenticado = True
             st.rerun()
         else:
             st.error("Senha incorreta!")
-    st.stop() # Bloqueia o carregamento do site se não digitar a senha correta
+    st.stop()
 
-# --- INICIALIZAÇÃO DAS VARIÁVEIS DO PROJETO ---
+# --- INICIALIZAÇÃO DE VARIÁVEIS ---
 if "comodos" not in st.session_state:
     st.session_state.comodos = []
 if "tues_temporarias" not in st.session_state:
     st.session_state.tues_temporarias = []
 
-def gerar_pdf(cliente, obra, comodos, circuitos):
+def gerar_pdf(cliente, obra, responsavel, registro, comodos, circuitos):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Helvetica", "B", 16)
@@ -42,7 +40,8 @@ def gerar_pdf(cliente, obra, comodos, circuitos):
     pdf.cell(190, 6, f"CLIENTE: {cliente.upper() if cliente else 'NAO INFORMADO'}", ln=True)
     pdf.set_font("Helvetica", "", 10)
     pdf.cell(190, 5, f"Endereco da Obra: {obra if obra else 'Nao informado'}", ln=True)
-    pdf.line(10, 42, 200, 42)
+    pdf.cell(190, 5, f"Responsavel Tecnico: {responsavel if responsavel else 'Nao informado'} | Registro: {registro if registro else 'Nao informado'}", ln=True)
+    pdf.line(10, 47, 200, 47)
     pdf.ln(5)
     
     pdf.set_font("Helvetica", "B", 12)
@@ -50,7 +49,7 @@ def gerar_pdf(cliente, obra, comodos, circuitos):
     pdf.set_font("Helvetica", "", 10)
     for c in comodos:
         t_str = "Umida" if c['molhada'] else "Seca"
-        txt = f"- {c['nome']} ({t_str}): {c['largura']:.1f}mx{c['comprimento']:.1f}m | Distancia ao QGD: {c['distancia']:.1f}m"
+        txt = f"- {c['nome']} ({t_str}): Area {c['area']:.1f}m2 | Tensao Base: {c['tensao']}V | QGD: {c['distancia']:.1f}m"
         pdf.cell(190, 6, txt.encode('latin-1', 'ignore').decode('latin-1'), ln=True)
     pdf.ln(5)
     
@@ -67,41 +66,51 @@ def gerar_pdf(cliente, obra, comodos, circuitos):
         pdf.ln(1)
     return pdf.output()
 
-st.title("⚡ Gestor de Projetos Elétricos Avançado")
-st.caption("Otimização de Circuitos, Cálculo de Queda de Tensão e Laudos Técnicos NBR 5410")
-st.markdown("### 👤 Identificação do Projeto")
+# --- DESIGN E ESTÉTICA DA LOGO ---
+st.markdown("""
+    <div style="background: linear-gradient(135deg, #1e3a8a, #3b82f6); padding: 20px; border-radius: 12px; margin-bottom: 25px; text-align: center; color: white;">
+        <h1 style="margin: 0; font-size: 32px;">⚡ PRO ELETRICA & ENGENHARIA</h1>
+        <p style="margin: 5px 0 0 0; opacity: 0.9; font-size: 14px;">Plataforma Homologada NBR 5410 - Gestão & Dimensionamento Avançado</p>
+    </div>
+""", unsafe_allow_html=True)
+st.markdown("### 👤 Identificação Profissional e do Cliente")
 c_cli1, c_cli2 = st.columns(2)
 nome_cliente = c_cli1.text_input("Nome do Cliente", placeholder="Ex: Joao Silva")
 endereco_obra = c_cli2.text_input("Endereço da Obra", placeholder="Ex: Rua das Palmeiras, 150")
+
+c_prof1, c_prof2 = st.columns(2)
+nome_responsavel = c_prof1.text_input("Responsável Técnico", placeholder="Ex: Eng. Pedro Santos")
+registro_tecnico = c_prof2.text_input("Registro Profissional (CREA / CFT)", placeholder="Ex: 506.XXX.XXX-SP")
 
 st.markdown("---")
 col_cadastro, col_projeto = st.columns([1.1, 1.4], gap="large")
 
 with col_cadastro:
     st.markdown("### 📝 Cadastrar Novo Cômodo")
-    nome_c = st.text_input("Nome do Cômodo", placeholder="Ex: Quarto 1, Cozinha")
-    tipo_c = st.radio("Tipo do Ambiente", ["Área Seca", "Área Úmida/Molhada"])
+    nome_c = st.text_input("Nome do Cômodo", placeholder="Ex: Suite Master, Cozinha")
+    tipo_c = st.radio("Classificação do Ambiente", ["Área Seca (Quartos, Sala, Corredores)", "Área Úmida/Molhada (Cozinha, Banheiro, Area Serv.)"])
     
     c1, c2, c3 = st.columns(3)
     larg_c = c1.number_input("Largura (m)", min_value=0.1, value=3.0, step=0.1)
     comp_c = c2.number_input("Comprimento (m)", min_value=0.1, value=4.0, step=0.1)
     dist_c = c3.number_input("Distância ao QGD (m)", min_value=1.0, value=10.0, step=1.0)
         
-    tensao_c = st.selectbox("Tensão Predominante (V)", (127, 220))
+    tensao_c = st.selectbox("Tensão da Iluminação e Tomadas Gerais (TUGs)", (127, 220))
     
-    st.markdown("#### 🔌 Adicionar TUEs deste Cômodo")
-    col_tue_nome, col_tue_w = st.columns([1.2, 1.0])
-    nome_tue = col_tue_nome.text_input("Nome do Equipamento", placeholder="Ex: Chuveiro, Ar Cond.")
+    st.markdown("#### 🔌 Adicionar TUEs deste Cômodo (Tensões Independentes)")
+    col_tue_nome, col_tue_w, col_tue_v = st.columns([1.2, 0.9, 0.7])
+    nome_tue = col_tue_nome.text_input("Equipamento", placeholder="Ex: Ar Condicionado")
     w_tue = col_tue_w.number_input("Potência (W)", min_value=0, value=0, step=100)
+    v_tue = col_tue_v.selectbox("Tensão (V)", (220, 127), key="tensao_tue_select")
         
-    if st.button("➕ Vincular TUE"):
+    if st.button("➕ Vincular TUE ao Cômodo"):
         if nome_tue and w_tue > 0:
-            st.session_state.tues_temporarias.append({"equipamento": nome_tue, "potencia": w_tue})
-            st.toast(f"TUE '{nome_tue}' vinculada.")
+            st.session_state.tues_temporarias.append({"equipamento": nome_tue, "potencia": w_tue, "tensao": v_tue})
+            st.toast(f"TUE '{nome_tue}' vinculada em {v_tue}V.")
             
     if st.session_state.tues_temporarias:
         for t in st.session_state.tues_temporarias:
-            st.caption(f"• {t['equipamento']}: {t['potencia']} W")
+            st.caption(f"• {t['equipamento']}: {t['potencia']}W em {t['tensao']}V")
             
     st.markdown("---")
     if st.button("💾 SALVAR CÔMODO NO PROJETO", type="primary"):
@@ -130,9 +139,8 @@ with col_cadastro:
         st.session_state.comodos = []
         st.session_state.tues_temporarias = []
         st.rerun()
-
 with col_projeto:
-    st.markdown("### 📋 Quadro de Distribuição Otimizado (QGD)")
+    st.markdown("### 📋 Quadro de Distribuição & Lista de Materiais")
     if not st.session_state.comodos:
         st.info("Nenhum cômodo cadastrado.")
     else:
@@ -176,13 +184,18 @@ with col_projeto:
                 circuitos.append({"numero": c_num, "nome": f"TUGs Secas Agrupadas ({', '.join(c_nome)})", "potencia": c_va, "tensao": v, "tipo": "TUG", "dr": "RECOMENDADO", "distancia": c_dist})
                 c_num += 1
 
+        # Processamento das TUEs com a tensão individual escolhida
         for c in st.session_state.comodos:
             for t in c['tues']:
                 circuitos.append({
                     "numero": c_num, "nome": f"TUE Exclusiva - {t['equipamento']} ({c['nome']})",
-                    "potencia": t['potencia'], "tensao": c['tensao'], "tipo": "TUE", "dr": "OBRIGATORIO", "distancia": c['distancia']
+                    "potencia": t['potencia'], "tensao": t['tensao'], "tipo": "TUE", "dr": "OBRIGATORIO", "distancia": c['distancia']
                 })
                 c_num += 1
+
+        # Dicionários para o Resumo quantitativo de Materiais
+        resumo_disjuntores = {}
+        resumo_cabos = {1.5: 0.0, 2.5: 0.0, 4.0: 0.0, 6.0: 0.0, 10.0: 0.0}
 
         for circ in circuitos:
             circ['corrente'] = circ['potencia'] / circ['tensao']
@@ -205,28 +218,46 @@ with col_projeto:
                         break
 
             i_proj = circ['corrente']
-            circ['disjuntor'] = 10 if i_proj <= 10 else 16 if i_proj <= 16 else 20 if i_proj <= 20 else 25 if i_proj <= 25 else 32 if i_proj <= 32 else 40
+            dj_adequado = 10 if i_proj <= 10 else 16 if i_proj <= 16 else 20 if i_proj <= 20 else 25 if i_proj <= 25 else 32 if i_proj <= 32 else 40
+            circ['disjuntor'] = dj_adequado
+            
+            # Alimenta o resumo de materiais (considerando Fase + Neutro/Fase + Terra para o comprimento linear)
+            resumo_disjuntores[dj_adequado] = resumo_disjuntores.get(dj_adequado, 0) + 1
+            resumo_cabos[circ['bitola']] += circ['distancia'] * 3.0
 
-        v_aba, d_aba = st.tabs(["🏠 Cômodos", "🗂️ Circuitos (QGD)"])
+        v_aba, d_aba, mat_aba = st.tabs(["🏠 Comodos", "🗂️ QGD (Circuitos)", "📦 Resumo de Materiais"])
+        
         with v_aba:
             for co in st.session_state.comodos:
                 with st.expander(f"📍 {co['nome'].upper()}"):
-                    st.write(f"Área: {co['area']:.1f} m2 | Distância ao Quadro: {co['distancia']:.1f}m")
+                    st.write(f"Area Base: {co['area']:.1f} m2 | Tensao Tomadas/Ilum: {co['tensao']}V")
                     if co['tues']:
                         for t in co['tues']:
-                            st.caption(f"🔸 TUE: {t['equipamento']} ({t['potencia']}W)")
+                            st.caption(f"🔸 TUE Vinc.: {t['equipamento']} ({t['potencia']}W em {t['tensao']}V)")
 
         with d_aba:
             for circ in circuitos:
                 st.markdown(f"""
                 <div style="border:1px solid #ddd; padding:12px; border-radius:6px; margin-bottom:10px; background-color:#1e222b;">
                     <h5 style="margin:0; color:#38bdf8;">Circuito {circ['numero']} - {circ['nome']}</h5>
-                    <p style="margin:2px 0; font-size:13px;"><b>Tensão:</b> {circ['tensao']}V | <b>Carga:</b> {circ['potencia']:.0f} VA | <b>Queda:</b> {circ['queda_tensao']:.2f}%</p>
-                    <p style="margin:2px 0; color:#4ade80; font-size:13px;">🔹 <b>Fio:</b> {circ['bitola']} mm² &nbsp;&nbsp;&nbsp;&nbsp; 🔹 <b>Disjuntor:</b> {circ['disjuntor']} A</p>
+                    <p style="margin:2px 0; font-size:13px;"><b>Tensao:</b> {circ['tensao']}V | <b>Carga:</b> {circ['potencia']:.0f} VA | <b>Queda:</b> {circ['queda_tensao']:.2f}%</p>
+                    <p style="margin:2px 0; color:#4ade80; font-size:13px;">🔹 <b>Fio:</b> {circ['bitola']} mm² &nbsp;&nbsp;&nbsp;&nbsp; 🔹 <b>Disjuntor DIN:</b> {circ['disjuntor']} A</p>
                 </div>
                 """, unsafe_allow_html=True)
                 
-        st.markdown("---")
-        dados_pdf = gerar_pdf(nome_cliente, endereco_obra, st.session_state.comodos, circuitos)
-        st.download_button(label="📥 DOWNLOAD LAUDO EM PDF", data=bytes(dados_pdf), file_name="laudo_eletrico.pdf", mime="application/pdf")
+        with mat_aba:
+            st.markdown("#### 🛒 Estimativa Quantitativa Básica para Compra")
+            st.write("Valores aproximados com base nas distâncias informadas ao quadro (incluindo margem de cabo para passagem):")
+            
+            st.markdown("**Disjuntores Termomagnéticos DIN:**")
+            for amp, quant in resumo_disjuntores.items():
+                st.write(f"• Disjuntor Monofásico/Bifásico {amp}A: **{quant} un.**")
+                
+            st.markdown("**Condutores de Cobre Flexível (Metragem Total Estimada):**")
+            for bit, metros in resumo_cabos.items():
+                if metros > 0:
+                    st.write(f"• Cabo {bit} mm²: **{metros:.1f} metros** (Total somando condutores do circuito)")
 
+        st.markdown("---")
+        dados_pdf = gerar_pdf(nome_cliente, endereco_obra, nome_responsavel, registro_tecnico, st.session_state.comodos, circuitos)
+        st.download_button(label="📥 DOWNLOAD LAUDO CORPORATIVO (PDF)", data=bytes(dados_pdf), file_name="laudo_pro_nbr5410.pdf", mime="application/pdf")
