@@ -67,7 +67,7 @@ with col_cadastro:
     comp_c = c2.number_input("Comprimento (m)", min_value=0.1, value=4.0, step=0.1)
     dist_c = c3.number_input("Distância ao QGD (m)", min_value=1.0, value=10.0, step=1.0)
         
-    tensao_c = st.selectbox("Tensão Predominante (V)", [127, 220])
+    tensao_c = st.selectbox("Tensão Predominante (V)", (127, 220))
     
     st.markdown("#### 🔌 Adicionar TUEs deste Cômodo")
     col_tue_nome, col_tue_w = st.columns([1.2, 1.0])
@@ -119,7 +119,8 @@ with col_projeto:
         circuitos = []
         c_num = 1
         
-        for v in:
+        # Correção do loop usando tupla explícita de tensões
+        for v in (127, 220):
             ilum_comodos = [c for c in st.session_state.comodos if c['tensao'] == v]
             if ilum_comodos:
                 circuitos.append({
@@ -129,7 +130,8 @@ with col_projeto:
                 })
                 c_num += 1
         
-        for v in:
+        # Correção do loop de tomadas usando tupla explícita de tensões
+        for v in (127, 220):
             umidas = [c for c in st.session_state.comodos if c['tensao'] == v and c['molhada']]
             for u in umidas:
                 circuitos.append({
@@ -169,9 +171,9 @@ with col_projeto:
             b_final = 1.5 if circ['tipo'] == "ILUM" else 2.5
             
             while True:
-                cap = 17.5 if b_final==1.5 else 24 if b_final==2.5 else 32 if b_final==4.0 else 41 if b_final==6.0 else 57
-                q_v = (2 * 0.0178 * circ['distancia'] * circ['corrente']) / b_final
-                pct = (q_v / circ['tensao']) * 100
+                cap = 17.5 if b_final==1.5 else 24.0 if b_final==2.5 else 32.0 if b_final==4.0 else 41.0 if b_final==6.0 else 57.0
+                q_v = (2.0 * 0.0178 * circ['distancia'] * circ['corrente']) / b_final
+                pct = (q_v / circ['tensao']) * 100.0
                 
                 if circ['corrente'] <= cap and pct <= 4.0:
                     circ['bitola'] = b_final
@@ -184,13 +186,9 @@ with col_projeto:
                         circ['queda_tensao'] = pct
                         break
 
-            # Lista comercial corrigida
-            disjuntores_comerciais = [10, 16, 20, 25, 32, 40]
-            circ['disjuntor'] = 40
-            for dj in disjuntores_comerciais:
-                if dj >= circ['corrente']:
-                    circ['disjuntor'] = dj
-                    break
+            # Substituição para lista comercial pura de disjuntores DIN
+            i_proj = circ['corrente']
+            circ['disjuntor'] = 10 if i_proj <= 10 else 16 if i_proj <= 16 else 20 if i_proj <= 20 else 25 if i_proj <= 25 else 32 if i_proj <= 32 else 40
 
         v_aba, d_aba = st.tabs(["🏠 Cômodos", "🗂️ Circuitos (QGD)"])
         with v_aba:
