@@ -1,9 +1,11 @@
 import math
 import streamlit as st
 from fpdf import FPDF
-# ==========================================
-# COLOQUE AQUI: SISTEMA DE SENHA BLOQUEADOR
-# ==========================================
+
+# A NBR 5410 exige que a configuração da página seja a PRIMEIRA linha executável do site:
+st.set_page_config(page_title="Gestor NBR 5410", layout="wide")
+
+# --- SISTEMA DE SEGURANÇA E SENHA ---
 if "autenticado" not in st.session_state:
     st.session_state.autenticado = False
 
@@ -12,27 +14,15 @@ if not st.session_state.autenticado:
     st.markdown("### 🔒 Acesso Restrito")
     senha = st.text_input("Digite a senha para acessar o Gestor:", type="password")
     if st.button("Entrar"):
-        # VOCÊ PODE MUDAR A PALAVRA 'mudar123' PARA A SENHA QUE VOCÊ QUISER:
+        # VOCÊ PODE ALTERAR O TEXTO "mudar123" PARA A SENHA QUE VOCÊ QUISER:
         if senha == "mudar123":  
             st.session_state.autenticado = True
             st.rerun()
         else:
             st.error("Senha incorreta!")
-    st.stop() # Trava o resto do site aqui se não estiver autenticado
+    st.stop() # Bloqueia o carregamento do site se não digitar a senha correta
 
-# ==========================================
-# CONTINUAÇÃO DO CÓDIGO (Deixe como está)
-# ==========================================
-st.set_page_config(page_title="Gestor NBR 5410", layout="wide")
-
-if "comodos" not in st.session_state:
-    st.session_state.comodos = []
-if "tues_temporarias" not in st.session_state:
-# ... resto do código continua igual até o fim
-
-
-st.set_page_config(page_title="Gestor NBR 5410", layout="wide")
-
+# --- INICIALIZAÇÃO DAS VARIÁVEIS DO PROJETO ---
 if "comodos" not in st.session_state:
     st.session_state.comodos = []
 if "tues_temporarias" not in st.session_state:
@@ -70,7 +60,6 @@ def gerar_pdf(cliente, obra, comodos, circuitos):
         pdf.set_font("Helvetica", "B", 10)
         pdf.cell(190, 6, f"Circuito {circ['numero']} - {circ['nome']} ({circ['tensao']}V)".encode('latin-1', 'ignore').decode('latin-1'), ln=True)
         pdf.set_font("Helvetica", "", 10)
-        # CORREÇÃO AQUI: Trocado 'queda' por 'queda_tensao' para bater com o resto do código
         linha2 = f"  -> Potencia: {circ['potencia']:.0f} VA | Corrente: {circ['corrente']:.2f} A | Queda: {circ['queda_tensao']:.2f}%"
         pdf.cell(190, 5, linha2, ln=True)
         pdf.cell(190, 5, f"  -> Condutor: {circ['bitola']} mm2 | Disjuntor: {circ['disjuntor']} A", ln=True)
