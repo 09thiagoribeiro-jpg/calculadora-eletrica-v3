@@ -29,7 +29,7 @@ if "comodos" not in st.session_state:
 if "tues_temporarias" not in st.session_state:
     st.session_state.tues_temporarias = []
 
-def gerar_pdf(cliente, obra, responsavel, registro, comodos, circuitos, padrao):
+def gerar_pdf(cliente, obra, responsavel, registro, comodos, circuitos, padrao, inc_padrao):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Helvetica", "B", 16)
@@ -47,11 +47,13 @@ def gerar_pdf(cliente, obra, responsavel, registro, comodos, circuitos, padrao):
     pdf.line(10, 47, 200, 47)
     pdf.ln(5)
     
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.cell(190, 8, f"PADRAO DE ENTRADA RECOMENDADO: {padrao['tipo']}", ln=True)
-    pdf.set_font("Helvetica", "", 10)
-    pdf.cell(190, 5, f"Disjuntor Geral do Padrao: {padrao['disjuntor']} A | Cabo do Ramal Principal: {padrao['cabo']} mm2", ln=True)
-    pdf.ln(5)
+    # Exibição condicional do Padrão de Entrada no PDF
+    if inc_padrao:
+        pdf.set_font("Helvetica", "B", 12)
+        pdf.cell(190, 8, f"PADRAO DE ENTRADA RECOMENDADO: {padrao['tipo']}", ln=True)
+        pdf.set_font("Helvetica", "", 10)
+        pdf.cell(190, 5, f"Disjuntor Geral do Padrao: {padrao['disjuntor']} A | Cabo do Ramal Principal: {padrao['cabo']} mm2", ln=True)
+        pdf.ln(5)
     
     pdf.set_font("Helvetica", "B", 12)
     pdf.cell(190, 8, "1. Quadro de Distribuicao de Circuitos Otimizado (QGD)", ln=True)
@@ -65,7 +67,7 @@ def gerar_pdf(cliente, obra, responsavel, registro, comodos, circuitos, padrao):
         pdf.ln(1)
     return pdf.output()
 
-def gerar_word(cliente, obra, responsavel, registro, circuitos, padrao):
+def gerar_word(cliente, obra, responsavel, registro, circuitos, padrao, inc_padrao):
     doc = Document()
     doc.add_heading("MEMORIAL DESCRITIVO E LAUDO ELETRICO", level=1)
     
@@ -73,8 +75,10 @@ def gerar_word(cliente, obra, responsavel, registro, circuitos, padrao):
     p.add_run(f"Cliente: {cliente}\nEndereço: {obra}\n").bold = True
     p.add_run(f"Responsável Técnico: {responsavel} | Registro: {registro}\n")
     
-    doc.add_heading("1. Dimensionamento do Padrão de Entrada Geral", level=2)
-    doc.add_paragraph(f"Tipo de Atendimento: {padrao['tipo']}\nDisjuntor Geral Sugerido: {padrao['disjuntor']} A\nCabo do Ramal de Entrada: {padrao['cabo']} mm²")
+    # Exibição condicional do Padrão de Entrada no Word
+    if inc_padrao:
+        doc.add_heading("1. Dimensionamento do Padrão de Entrada Geral", level=2)
+        doc.add_paragraph(f"Tipo de Atendimento: {padrao['tipo']}\nDisjuntor Geral Sugerido: {padrao['disjuntor']} A\nCabo do Ramal de Entrada: {padrao['cabo']} mm²")
     
     doc.add_heading("2. Detalhamento dos Circuitos Terminais (QGD)", level=2)
     for circ in circuitos:
@@ -91,7 +95,7 @@ def gerar_word(cliente, obra, responsavel, registro, circuitos, padrao):
 st.markdown("""
     <div style="background-color: #111827; padding: 24px; border-radius: 12px; margin-bottom: 30px; text-align: center; border: 1px solid #1e3a8a;">
         <div style="font-size: 40px; margin-bottom: 5px; text-shadow: 0 0 12px #3b82f6;">⚡</div>
-        <h1 style="margin: 0; font-size: 28px; font-weight: 800; letter-spacing: 2.5px; color: #ffffff;">RIBEIRO ELÉTRICA <span style="color: #3b82f6;">PRO</span></h1>
+        <h1 style="margin: 0; font-size: 28px; font-weight: 800; letter-spacing: 2.5px; color: #ffffff;">PRO ELÉTRICA <span style="color: #3b82f6;">PRO</span></h1>
         <div style="width: 60px; height: 3px; background: linear-gradient(90deg, #1e3a8a, #3b82f6); margin: 12px auto; border-radius: 2px;"></div>
         <p style="margin: 0; color: #9ca3af; font-size: 13px; font-weight: 500; letter-spacing: 1px;">SISTEMA INTELIGENTE DE DIMENSIONAMENTO • NBR 5410</p>
     </div>
@@ -104,6 +108,10 @@ endereco_obra = c_cli2.text_input("Endereço da Obra", placeholder="Ex: Rua das 
 c_prof1, c_prof2 = st.columns(2)
 nome_responsavel = c_prof1.text_input("Responsável Técnico", placeholder="Ex: Eng. Pedro Santos")
 registro_tecnico = c_prof2.text_input("Registro Profissional (CREA / CFT)", placeholder="Ex: 506.XXX-SP")
+
+# --- NOVO SELETOR DE ESCOPO DO SERVIÇO (COM OU SEM PADRÃO) ---
+st.markdown("#### 🛠️ Escopo do Serviço Contratado")
+inclui_padrao_entrada = st.checkbox("Incluir dimensionamento e fornecimento do Padrão de Entrada (Caixa de Medição)", value=True, help="Desmarque esta opção se o cliente já possuir o padrão de entrada pronto e homologado pela concessionária local.")
 
 st.markdown("---")
 col_cadastro, col_projeto = st.columns([1.1, 1.4], gap="large")
@@ -119,7 +127,7 @@ with col_cadastro:
     dist_c = c3.number_input("Distância ao QGD (m)", min_value=1.0, value=10.0, step=1.0)
         
     tensao_c = st.selectbox("Tensão da Iluminação e Tomadas Gerais (TUGs)", (127, 220))
-    agrup_c = st.number_input("Circuitos Agrupados no Eletroduto", min_value=1, value=2, step=1, help="Quantidade de circuitos que passam pelo mesmo eletroduto.")
+    agrup_c = st.number_input("Circuitos Agrupados no Eletroduto", min_value=1, value=2, step=1)
     
     st.markdown("#### 🔌 Cargas Especiais / TUEs do Cômodo")
     col_tue_nome, col_tue_w, col_tue_v = st.columns([1.2, 0.9, 0.7])
@@ -136,7 +144,6 @@ with col_cadastro:
         st.write("**TUEs vinculadas provisoriamente:**")
         tues_para_remover = []
         for idx, t in enumerate(st.session_state.tues_temporarias):
-            # FIX: st.columns(2) corrigido para evitar o travamento visual
             t_col1, t_col2 = st.columns(2)
             t_col1.caption(f"• {t['equipamento']}: {t['potencia']}W ({t['tensao']}V)")
             if t_col2.button("❌", key=f"del_tue_temp_{idx}"):
@@ -223,9 +230,9 @@ with col_projeto:
                 })
                 c_num += 1
 
+        # Escopo Opcional: Cálculo do Padrão
         pot_total_instalada = sum(circ['potencia'] for circ in circuitos)
         pot_com_demanda_w = pot_total_instalada * 0.5
-        
         padrao = {"tipo": "Monofasico (Ate 12kW)", "disjuntor": 40, "cabo": 10.0}
         if 12000 < pot_com_demanda_w <= 25000:
             padrao = {"tipo": "Bifasico (Ate 25kW)", "disjuntor": 50, "cabo": 16.0}
@@ -257,7 +264,8 @@ with col_projeto:
                         circ['queda_tensao'] = pct
                         break
 
-            dj_adequado = 10 if circ['corrente']<=10 else 16 if circ['corrente']<=16 else 20 if circ['corrente']<=20 else 25 if circ['corrente']<=25 else 32 if circ['corrente']<=32 else 40
+            i_proj = circ['corrente']
+            dj_adequado = 10 if i_proj <= 10 else 16 if i_proj <= 16 else 20 if i_proj <= 20 else 25 if i_proj <= 25 else 32 if i_proj <= 32 else 40
             circ['disjuntor'] = dj_adequado
             resumo_disjuntores[dj_adequado] = resumo_disjuntores.get(dj_adequado, 0) + 1
             resumo_cabos[circ['bitola']] += circ['distancia'] * 3.0
@@ -269,22 +277,6 @@ with col_projeto:
             for idx, co in enumerate(st.session_state.comodos):
                 with st.expander(f"📍 {co['nome'].upper()}"):
                     st.write(f"Area: {co['area']:.1f} m2 | Condutores agrupados: {co['agrupados']}")
-                    
-                    if co['tues']:
-                        st.write("Cargas Especiais (TUEs) Ativas:")
-                        tues_internas_para_remover = []
-                        for t_idx, t in enumerate(co['tues']):
-                            # FIX: st.columns(2) adicionado para evitar travamento interno na exclusao
-                            t_col1, t_col2 = st.columns(2)
-                            t_col1.write(f"🔸 {t['equipamento']} ({t['potencia']}W em {t['tensao']}V)")
-                            if t_col2.button("🗑️", key=f"del_tue_salva_{idx}_{t_idx}"):
-                                tues_internas_para_remover.append(t_idx)
-                        
-                        if tues_internas_para_remover:
-                            for t_index in tues_internas_para_remover:
-                                co['tues'].pop(t_index)
-                            st.rerun()
-                            
                     if st.button("Remover Comodo Completo", key=f"del_comodo_{idx}"):
                         comodo_remover = idx
             if comodo_remover is not None:
@@ -292,9 +284,13 @@ with col_projeto:
                 st.rerun()
 
         with d_aba:
-            st.markdown(f"#### 🏢 Entrada Geral: **{padrao['tipo']}**")
-            st.caption(f"Disjuntor Geral da Caixa: **{padrao['disjuntor']}A** | Bitola Geral do Padrao: **{padrao['cabo']} mm²**")
-            st.markdown("---")
+            if inclui_padrao_entrada:
+                st.markdown(f"#### 🏢 Entrada Geral: **{padrao['tipo']}**")
+                st.caption(f"Disjuntor Geral da Caixa: **{padrao['disjuntor']}A** | Bitola Geral do Padrao: **{padrao['cabo']} mm²**")
+                st.markdown("---")
+            else:
+                st.info("ℹ️ **Escopo de Serviço:** O Padrão de Entrada Geral (concessionária) foi excluído deste laudo a pedido do contratante.")
+            
             for circ in circuitos:
                 st.markdown(f"""
                 <div style="border:1px solid #ddd; padding:12px; border-radius:6px; margin-bottom:10px; background-color:#1e222b;">
@@ -306,8 +302,9 @@ with col_projeto:
                 
         with mat_aba:
             st.markdown("#### 🛒 Lista de Compras Estimada")
-            st.write(f"• Cabo de Cobre do Padrao ({padrao['cabo']} mm²): **15.0 metros**")
-            st.write(f"• Disjuntor Geral do Padrao {padrao['disjuntor']}A: **1 un.**")
+            if inclui_padrao_entrada:
+                st.write(f"• Cabo de Cobre do Padrao ({padrao['cabo']} mm²): **15.0 metros**")
+                st.write(f"• Disjuntor Geral do Padrao {padrao['disjuntor']}A: **1 un.**")
             for amp, quant in resumo_disjuntores.items():
                 st.write(f"• Disjuntor Termomagnetico DIN {amp}A: **{quant} un.**")
             for bit, metros in resumo_cabos.items():
@@ -316,11 +313,10 @@ with col_projeto:
 
         st.markdown("---")
         st.markdown("#### 📂 Exportação da Documentação da Obra")
-        
         c_down1, c_down2 = st.columns(2)
         with c_down1:
-            dados_pdf = gerar_pdf(nome_cliente, endereco_obra, nome_responsavel, registro_tecnico, st.session_state.comodos, circuitos, padrao)
+            dados_pdf = gerar_pdf(nome_cliente, endereco_obra, nome_responsavel, registro_tecnico, st.session_state.comodos, circuitos, padrao, inclui_padrao_entrada)
             st.download_button(label="📥 BAIXAR LAUDO EM PDF", data=bytes(dados_pdf), file_name="laudo_eletrico.pdf", mime="application/pdf")
         with c_down2:
-            dados_word = gerar_word(nome_cliente, endereco_obra, nome_responsavel, registro_tecnico, circuitos, padrao)
+            dados_word = gerar_word(nome_cliente, endereco_obra, nome_responsavel, registro_tecnico, circuitos, padrao, inclui_padrao_entrada)
             st.download_button(label="📝 BAIXAR MEMORIAL EM WORD (.DOCX)", data=dados_word, file_name="memorial_descritivo.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
