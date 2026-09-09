@@ -1,8 +1,10 @@
 import math
 import streamlit as st
 from fpdf import FPDF
+from docx import Document
+from io import BytesIO
 
-# Configuração obrigatória do Streamlit na primeira linha executável
+# Configuração de página inicial obrigatória do Streamlit
 st.set_page_config(page_title="Gestor Eletrico Pro", layout="wide")
 
 # --- SISTEMA DE SEGURANÇA E SENHA ---
@@ -27,7 +29,7 @@ if "comodos" not in st.session_state:
 if "tues_temporarias" not in st.session_state:
     st.session_state.tues_temporarias = []
 
-def gerar_pdf(cliente, obra, responsavel, registro, comodos, circuitos):
+def gerar_pdf(cliente, obra, responsavel, registro, comodos, circuitos, padrao):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Helvetica", "B", 16)
@@ -46,31 +48,50 @@ def gerar_pdf(cliente, obra, responsavel, registro, comodos, circuitos):
     pdf.ln(5)
     
     pdf.set_font("Helvetica", "B", 12)
-    pdf.cell(190, 8, "1. Relacao de Ambientes Cadastrados", ln=True)
+    pdf.cell(190, 8, f"PADRAO DE ENTRADA RECOMENDADO: {padrao['tipo']}", ln=True)
     pdf.set_font("Helvetica", "", 10)
-    for c in comodos:
-        t_str = "Umida" if c['molhada'] else "Seca"
-        txt = f"- {c['nome']} ({t_str}): Area {c['area']:.1f}m2 | Tensao Base: {c['tensao']}V"
-        pdf.cell(190, 6, txt.encode('latin-1', 'ignore').decode('latin-1'), ln=True)
+    pdf.cell(190, 5, f"Disjuntor Geral do Padrao: {padrao['disjuntor']} A | Cabo do Ramal Principal: {padrao['cabo']} mm2", ln=True)
     pdf.ln(5)
     
     pdf.set_font("Helvetica", "B", 12)
-    pdf.cell(190, 8, "2. Quadro de Distribuicao de Circuitos Otimizado (QGD)", ln=True)
+    pdf.cell(190, 8, "1. Quadro de Distribuicao de Circuitos Otimizado (QGD)", ln=True)
     for circ in circuitos:
         pdf.set_font("Helvetica", "B", 10)
         pdf.cell(190, 6, f"Circuito {circ['numero']} - {circ['nome']} ({circ['tensao']}V)".encode('latin-1', 'ignore').decode('latin-1'), ln=True)
         pdf.set_font("Helvetica", "", 10)
         linha2 = f"  -> Potencia: {circ['potencia']:.0f} VA | Corrente: {circ['corrente']:.2f} A | Queda: {circ['queda_tensao']:.2f}%"
         pdf.cell(190, 5, linha2, ln=True)
-        pdf.cell(190, 5, f"  -> Condutor: {circ['bitola']} mm2 | Disjuntor: {circ['disjuntor']} A", ln=True)
+        pdf.cell(190, 5, f"  -> Condutor: {circ['bitola']} mm2 | Disjuntor: {circ['disjuntor']} A | Agrupamento: {circ['agrupados']} circ.", ln=True)
         pdf.ln(1)
     return pdf.output()
+
+def gerar_word(cliente, obra, responsavel, registro, circuitos, padrao):
+    doc = Document()
+    doc.add_heading("MEMORIAL DESCRITIVO E LAUDO ELETRICO", level=1)
+    
+    p = doc.add_paragraph()
+    p.add_run(f"Cliente: {cliente}\nEndereço: {obra}\n").bold = True
+    p.add_run(f"Responsável Técnico: {responsavel} | Registro: {registro}\n")
+    
+    doc.add_heading("1. Dimensionamento do Padrão de Entrada Geral", level=2)
+    doc.add_paragraph(f"Tipo de Atendimento: {padrao['tipo']}\nDisjuntor Geral Sugerido: {padrao['disjuntor']} A\nCabo do Ramal de Entrada: {padrao['cabo']} mm²")
+    
+    doc.add_heading("2. Detalhamento dos Circuitos Terminais (QGD)", level=2)
+    for circ in circuitos:
+        doc.add_paragraph(f"Circuito {circ['numero']} - {circ['nome']}\n"
+                          f"Potência: {circ['potencia']:.0f} VA | Tensão: {circ['tensao']} V\n"
+                          f"Condutor Final: {circ['bitola']} mm² | Proteção (Disjuntor): {circ['disjuntor']} A\n"
+                          f"Queda de Tensão Calculada: {circ['queda_tensao']:.2f}% | Agrupamento no Eletroduto: {circ['agrupados']} circuito(s)")
+    
+    target = BytesIO()
+    doc.save(target)
+    return target.getvalue()
 
 # --- DESIGN DA LOGO PREMIUM ---
 st.markdown("""
     <div style="background-color: #111827; padding: 24px; border-radius: 12px; margin-bottom: 30px; text-align: center; border: 1px solid #1e3a8a;">
         <div style="font-size: 40px; margin-bottom: 5px; text-shadow: 0 0 12px #3b82f6;">⚡</div>
-        <h1 style="margin: 0; font-size: 28px; font-weight: 800; letter-spacing: 2.5px; color: #ffffff;">RIBEIRO ELÉTRICA <span style="color: #3b82f6;">PRO</span></h1>
+        <h1 style="margin: 0; font-size: 28px; font-weight: 800; letter-spacing: 2.5px; color: #ffffff;">PRO ELÉTRICA <span style="color: #3b82f6;">PRO</span></h1>
         <div style="width: 60px; height: 3px; background: linear-gradient(90deg, #1e3a8a, #3b82f6); margin: 12px auto; border-radius: 2px;"></div>
         <p style="margin: 0; color: #9ca3af; font-size: 13px; font-weight: 500; letter-spacing: 1px;">SISTEMA INTELIGENTE DE DIMENSIONAMENTO • NBR 5410</p>
     </div>
@@ -98,6 +119,7 @@ with col_cadastro:
     dist_c = c3.number_input("Distância ao QGD (m)", min_value=1.0, value=10.0, step=1.0)
         
     tensao_c = st.selectbox("Tensão da Iluminação e Tomadas Gerais (TUGs)", (127, 220))
+    agrup_c = st.number_input("Circuitos Agrupados no Eletroduto", min_value=1, value=2, step=1, help="Quantidade de circuitos que vão passar pelo mesmo eletroduto deste cômodo (Fator de Agrupamento da NBR 5410).")
     
     st.markdown("#### 🔌 Cargas Especiais / TUEs do Cômodo")
     col_tue_nome, col_tue_w, col_tue_v = st.columns([1.2, 0.9, 0.7])
@@ -114,7 +136,7 @@ with col_cadastro:
         st.write("**TUEs vinculadas provisoriamente:**")
         tues_para_remover = []
         for idx, t in enumerate(st.session_state.tues_temporarias):
-            t_col1, t_col2 = st.columns([4, 1])
+            t_col1, t_col2 = st.columns()
             t_col1.caption(f"• {t['equipamento']}: {t['potencia']}W ({t['tensao']}V)")
             if t_col2.button("❌", key=f"del_tue_temp_{idx}"):
                 tues_para_remover.append(idx)
@@ -138,7 +160,7 @@ with col_cadastro:
             st.session_state.comodos.append({
                 "nome": nome_c, "molhada": is_molhada, "largura": larg_c, "comprimento": comp_c,
                 "area": area_calc, "perimetro": per_calc, "tensao": tensao_c, "distancia": dist_c,
-                "va_ilum": va_ilum, "q_tugs": q_tugs, "va_tugs": va_tugs, "tues": list(st.session_state.tues_temporarias)
+                "va_ilum": va_ilum, "q_tugs": q_tugs, "va_tugs": va_tugs, "agrupados": agrup_c, "tues": list(st.session_state.tues_temporarias)
             })
             st.session_state.tues_temporarias = []
             st.rerun()
@@ -148,34 +170,35 @@ with col_cadastro:
         st.session_state.tues_temporarias = []
         st.rerun()
 with col_projeto:
-    st.markdown("### 📋 Quadro de Distribuição & Edição")
+    st.markdown("### 📋 Quadro de Distribuição Otimizado")
     if not st.session_state.comodos:
         st.info("Nenhum cômodo cadastrado.")
     else:
         circuitos = []
         c_num = 1
         
+        # 1. Iluminação Geral
         for v in (127, 220):
             ilum_comodos = [c for c in st.session_state.comodos if c['tensao'] == v]
             if ilum_comodos:
                 circuitos.append({
-                    "numero": c_num, "nome": f"Iluminacao Geral ({v}V)", 
-                    "potencia": sum(c['va_ilum'] for c in ilum_comodos),
-                    "tensao": v, "tipo": "ILUM", "dr": "RECOMENDADO", "distancia": max(c['distancia'] for c in ilum_comodos)
+                    "numero": c_num, "nome": f"Iluminacao Geral ({v}V)", "potencia": sum(c['va_ilum'] for c in ilum_comodos),
+                    "tensao": v, "tipo": "ILUM", "dr": "RECOMENDADO", "distancia": max(c['distancia'] for c in ilum_comodos), "agrupados": max(c['agrupados'] for c in ilum_comodos)
                 })
                 c_num += 1
         
+        # 2. Tomadas Gerais (TUGs)
         for v in (127, 220):
             umidas = [c for c in st.session_state.comodos if c['tensao'] == v and c['molhada']]
             for u in umidas:
                 circuitos.append({
                     "numero": c_num, "nome": f"TUGs Cozinha/Servico - {u['nome']}", "potencia": u['va_tugs'],
-                    "tensao": v, "tipo": "TUG", "dr": "OBRIGATORIO", "distancia": u['distancia']
+                    "tensao": v, "tipo": "TUG", "dr": "OBRIGATORIO", "distancia": u['distancia'], "agrupados": u['agrupados']
                 })
                 c_num += 1
             
             secas = [c for c in st.session_state.comodos if c['tensao'] == v and not c['molhada']]
-            c_nome, c_va, c_dist = [], 0, 0
+            c_nome, c_va, c_dist, c_agrup = [], 0, 0, 1
             limite = 1200 if v == 127 else 2500
             
             for s in secas:
@@ -183,36 +206,56 @@ with col_projeto:
                     c_nome.append(s['nome'])
                     c_va += s['va_tugs']
                     c_dist = max(c_dist, s['distancia'])
+                    c_agrup = max(c_agrup, s['agrupados'])
                 else:
                     if c_va > 0:
-                        circuitos.append({"numero": c_num, "nome": f"TUGs Secas Agrupadas ({', '.join(c_nome)})", "potencia": c_va, "tensao": v, "tipo": "TUG", "dr": "RECOMENDADO", "distancia": c_dist})
+                        circuitos.append({"numero": c_num, "nome": f"TUGs Secas Agrupadas ({', '.join(c_nome)})", "potencia": c_va, "tensao": v, "tipo": "TUG", "dr": "RECOMENDADO", "distancia": c_dist, "agrupados": c_agrup})
                         c_num += 1
-                    c_nome, c_va, c_dist = [s['nome']], s['va_tugs'], s['distancia']
+                    c_nome, c_va, c_dist, c_agrup = [s['nome']], s['va_tugs'], s['distancia'], s['agrupados']
             if c_va > 0:
-                circuitos.append({"numero": c_num, "nome": f"TUGs Secas Agrupadas ({', '.join(c_nome)})", "potencia": c_va, "tensao": v, "tipo": "TUG", "dr": "RECOMENDADO", "distancia": c_dist})
+                circuitos.append({"numero": c_num, "nome": f"TUGs Secas Agrupadas ({', '.join(c_nome)})", "potencia": c_va, "tensao": v, "tipo": "TUG", "dr": "RECOMENDADO", "distancia": c_dist, "agrupados": c_agrup})
                 c_num += 1
 
+        # 3. TUEs Individuais
         for c in st.session_state.comodos:
             for t in c['tues']:
                 circuitos.append({
-                    "numero": c_num, "nome": f"TUE Exclusiva - {t['equipamento']} ({c['nome']})",
-                    "potencia": t['potencia'], "tensao": t['tensao'], "tipo": "TUE", "dr": "OBRIGATORIO", "distancia": c['distancia']
+                    "numero": c_num, "nome": f"TUE Exclusiva - {t['equipamento']} ({c['nome']})", "potencia": t['potencia'],
+                    "tensao": t['tensao'], "tipo": "TUE", "dr": "OBRIGATORIO", "distancia": c['distancia'], "agrupados": c['agrupados']
                 })
                 c_num += 1
+
+        # --- CÁLCULO DE PADRÃO DE ENTRADA GERAL DA EDIFICAÇÃO ---
+        pot_total_instalada = sum(circ['potencia'] for circ in circuitos)
+        # Aplicação simplificada do fator de demanda normativo médio (0.5) para dimensionamento de entrada
+        pot_com_demanda_w = pot_total_instalada * 0.5
+        
+        padrao = {"tipo": "Monofasico (Ate 12kW)", "disjuntor": 40, "cabo": 10.0}
+        if 12000 < pot_com_demanda_w <= 25000:
+            padrao = {"tipo": "Bifasico (Ate 25kW)", "disjuntor": 50, "cabo": 16.0}
+        elif pot_com_demanda_w > 25000:
+            padrao = {"tipo": "Trifasico (Acima de 25kW)", "disjuntor": 63, "cabo": 25.0}
 
         resumo_disjuntores = {}
         resumo_cabos = {1.5: 0.0, 2.5: 0.0, 4.0: 0.0, 6.0: 0.0, 10.0: 0.0}
 
+        # --- ENGENHARIA DE PROJEÇÃO TÉRMICA (AGRUPAMENTO E QUEDA) ---
         for circ in circuitos:
             circ['corrente'] = circ['potencia'] / circ['tensao']
+            
+            # Tabela 42 NBR 5410: Fatores de agrupamento para condutores em eletrodutos
+            f_agrup = 1.0 if circ['agrupados'] == 1 else 0.80 if circ['agrupados'] == 2 else 0.70 if circ['agrupados'] == 3 else 0.65
             b_final = 1.5 if circ['tipo'] == "ILUM" else 2.5
             
             while True:
-                cap = 17.5 if b_final==1.5 else 24.0 if b_final==2.5 else 32.0 if b_final==4.0 else 41.0 if b_final==6.0 else 57.0
+                cap_base = 17.5 if b_final==1.5 else 24.0 if b_final==2.5 else 32.0 if b_final==4.0 else 41.0 if b_final==6.0 else 57.0
+                # Aplicação rigorosa do Fator Térmico de Agrupamento
+                cap_corrigida = cap_base * f_agrup
+                
                 q_v = (2.0 * 0.0178 * circ['distancia'] * circ['corrente']) / b_final
                 pct = (q_v / circ['tensao']) * 100.0
                 
-                if circ['corrente'] <= cap and pct <= 4.0:
+                if circ['corrente'] <= cap_corrigida and pct <= 4.0:
                     circ['bitola'] = b_final
                     circ['queda_tensao'] = pct
                     break
@@ -223,60 +266,56 @@ with col_projeto:
                         circ['queda_tensao'] = pct
                         break
 
-            i_proj = circ['corrente']
-            dj_adequado = 10 if i_proj <= 10 else 16 if i_proj <= 16 else 20 if i_proj <= 20 else 25 if i_proj <= 25 else 32 if i_proj <= 32 else 40
+            dj_adequado = 10 if circ['corrente']<=10 else 16 if circ['corrente']<=16 else 20 if circ['corrente']<=20 else 25 if circ['corrente']<=25 else 32 if circ['corrente']<=32 else 40
             circ['disjuntor'] = dj_adequado
             
             resumo_disjuntores[dj_adequado] = resumo_disjuntores.get(dj_adequado, 0) + 1
             resumo_cabos[circ['bitola']] += circ['distancia'] * 3.0
 
-        v_aba, d_aba, mat_aba = st.tabs(["🏠 Gerenciar Comodos", "🗂️ QGD (Circuitos)", "📦 Materiais"])
+        v_aba, d_aba, mat_aba = st.tabs(["🏠 Gerenciar", "🗂️ QGD & Padrao", "📦 Lista de Materiais"])
         
         with v_aba:
             comodo_remover = None
             for idx, co in enumerate(st.session_state.comodos):
                 with st.expander(f"📍 {co['nome'].upper()}"):
-                    st.write(f"Area: {co['area']:.1f} m2 | Distancia: {co['distancia']}m")
-                    
-                    if co['tues']:
-                        st.write("Cargas Especiais (TUEs) Ativas:")
-                        tues_internas_para_remover = []
-                        for t_idx, t in enumerate(co['tues']):
-                            t_col1, t_col2 = st.columns([4, 1])
-                            t_col1.write(f"🔸 {t['equipamento']} ({t['potencia']}W em {t['tensao']}V)")
-                            if t_col2.button("🗑️", key=f"del_tue_salva_{idx}_{t_idx}"):
-                                tues_internas_para_remover.append(t_idx)
-                        
-                        if tues_internas_para_remover:
-                            for t_index in tues_internas_para_remover:
-                                co['tues'].pop(t_index)
-                            st.rerun()
-                    
+                    st.write(f"Area: {co['area']:.1f} m2 | Condutores agrupados neste ramal: {co['agrupados']}")
                     if st.button("Remover Comodo Completo", key=f"del_comodo_{idx}"):
                         comodo_remover = idx
-            
             if comodo_remover is not None:
                 st.session_state.comodos.pop(comodo_remover)
                 st.rerun()
 
         with d_aba:
+            st.markdown(f"#### 🏢 Entrada Geral: **{padrao['tipo']}**")
+            st.caption(f"Disjuntor Geral da Caixa: **{padrao['disjuntor']}A** | Bitola Geral do Padrão: **{padrao['cabo']} mm²**")
+            st.markdown("---")
             for circ in circuitos:
                 st.markdown(f"""
                 <div style="border:1px solid #ddd; padding:12px; border-radius:6px; margin-bottom:10px; background-color:#1e222b;">
                     <h5 style="margin:0; color:#38bdf8;">Circuito {circ['numero']} - {circ['nome']}</h5>
-                    <p style="margin:2px 0; font-size:13px;"><b>Tensao:</b> {circ['tensao']}V | <b>Carga:</b> {circ['potencia']:.0f} VA | <b>Queda:</b> {circ['queda_tensao']:.2f}%</p>
-                    <p style="margin:2px 0; color:#4ade80; font-size:13px;">🔹 <b>Fio:</b> {circ['bitola']} mm² &nbsp;&nbsp;&nbsp;&nbsp; 🔹 <b>Disjuntor:</b> {circ['disjuntor']} A</p>
+                    <p style="margin:2px 0; font-size:13px;"><b>Fio dimensionado com Fator Térmico:</b> {circ['bitola']} mm² | <b>Disjuntor:</b> {circ['disjuntor']} A</p>
+                    <p style="margin:2px 0; font-size:12px; color:#aaa;">Queda de Tensão: {circ['queda_tensao']:.2f}% | Condutores no mesmo duto: {circ['agrupados']}</p>
                 </div>
                 """, unsafe_allow_html=True)
                 
         with mat_aba:
-            st.markdown("#### 🛒 Estimativa Quantitativa de Materiais")
+            st.markdown("#### 🛒 Lista de Compras Estimada")
+            st.write(f"• Cabo de Cobre do Padrão ({padrao['cabo']} mm²): **15.0 metros**")
+            st.write(f"• Disjuntor Geral do Padrão {padrao['disjuntor']}A: **1 un.**")
             for amp, quant in resumo_disjuntores.items():
-                st.write(f"• Disjuntor {amp}A: **{quant} un.**")
+                st.write(f"• Disjuntor Termomagnético DIN {amp}A: **{quant} un.**")
             for bit, metros in resumo_cabos.items():
                 if metros > 0:
-                    st.write(f"• Cabo {bit} mm²: **{metros:.1f} metros**")
+                    st.write(f"• Cabo Flexível {bit} mm²: **{metros:.1f} metros**")
 
         st.markdown("---")
-        dados_pdf = gerar_pdf(nome_cliente, endereco_obra, nome_responsavel, registro_tecnico, st.session_state.comodos, circuitos)
-        st.download_button(label="📥 DOWNLOAD LAUDO EM PDF", data=bytes(dados_pdf), file_name="laudo_eletrico.pdf", mime="application/pdf")
+        st.markdown("#### 📂 Exportação da Documentação da Obra")
+        
+        c_down1, c_down2 = st.columns(2)
+        with c_down1:
+            dados_pdf = gerar_pdf(nome_cliente, endereco_obra, nome_responsavel, registro_tecnico, st.session_state.comodos, circuitos, padrao)
+            st.download_button(label="📥 BAIXAR LAUDO EM PDF", data=bytes(dados_pdf), file_name="laudo_eletrico.pdf", mime="application/pdf")
+        with c_down2:
+            dados_word = gerar_word(nome_cliente, endereco_obra, nome_responsavel, registro_tecnico, circuitos, padrao)
+            st.download_button(label="📝 BAIXAR MEMORIAL EM WORD (.DOCX)", data=dados_word, file_name="memorial_descritivo.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+
