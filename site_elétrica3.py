@@ -2,6 +2,7 @@ import math
 import streamlit as st
 from fpdf import FPDF
 
+# Configuração obrigatória do Streamlit na primeira linha executável
 st.set_page_config(page_title="Gestor Eletrico Pro", layout="wide")
 
 # --- SISTEMA DE SEGURANÇA E SENHA ---
@@ -49,7 +50,7 @@ def gerar_pdf(cliente, obra, responsavel, registro, comodos, circuitos):
     pdf.set_font("Helvetica", "", 10)
     for c in comodos:
         t_str = "Umida" if c['molhada'] else "Seca"
-        txt = f"- {c['nome']} ({t_str}): Area {c['area']:.1f}m2 | Tensao Base: {c['tensao']}V | QGD: {c['distancia']:.1f}m"
+        txt = f"- {c['nome']} ({t_str}): Area {c['area']:.1f}m2 | Tensao Base: {c['tensao']}V"
         pdf.cell(190, 6, txt.encode('latin-1', 'ignore').decode('latin-1'), ln=True)
     pdf.ln(5)
     
@@ -62,14 +63,16 @@ def gerar_pdf(cliente, obra, responsavel, registro, comodos, circuitos):
         linha2 = f"  -> Potencia: {circ['potencia']:.0f} VA | Corrente: {circ['corrente']:.2f} A | Queda: {circ['queda_tensao']:.2f}%"
         pdf.cell(190, 5, linha2, ln=True)
         pdf.cell(190, 5, f"  -> Condutor: {circ['bitola']} mm2 | Disjuntor: {circ['disjuntor']} A", ln=True)
-        pdf.cell(190, 5, f"  -> DR: {circ['dr']} | DPS: Obrigatorio Classe II", ln=True)
         pdf.ln(1)
     return pdf.output()
 
+# --- DESIGN DA LOGO PREMIUM ---
 st.markdown("""
-    <div style="background: linear-gradient(135deg, #1e3a8a, #3b82f6); padding: 20px; border-radius: 12px; margin-bottom: 25px; text-align: center; color: white;">
-        <h1 style="margin: 0; font-size: 32px;">⚡ RIBEIRO ELÉTRICA ⚡</h1>
-        <p style="margin: 5px 0 0 0; opacity: 0.9; font-size: 14px;">Plataforma Homologada NBR 5410 - Gestão & Dimensionamento Avançado</p>
+    <div style="background-color: #111827; padding: 24px; border-radius: 12px; margin-bottom: 30px; text-align: center; border: 1px solid #1e3a8a;">
+        <div style="font-size: 40px; margin-bottom: 5px; text-shadow: 0 0 12px #3b82f6;">⚡</div>
+        <h1 style="margin: 0; font-size: 28px; font-weight: 800; letter-spacing: 2.5px; color: #ffffff;">PRO ELÉTRICA <span style="color: #3b82f6;">PRO</span></h1>
+        <div style="width: 60px; height: 3px; background: linear-gradient(90deg, #1e3a8a, #3b82f6); margin: 12px auto; border-radius: 2px;"></div>
+        <p style="margin: 0; color: #9ca3af; font-size: 13px; font-weight: 500; letter-spacing: 1px;">SISTEMA INTELIGENTE DE DIMENSIONAMENTO • NBR 5410</p>
     </div>
 """, unsafe_allow_html=True)
 st.markdown("### 👤 Identificação Profissional e do Cliente")
@@ -79,7 +82,7 @@ endereco_obra = c_cli2.text_input("Endereço da Obra", placeholder="Ex: Rua das 
 
 c_prof1, c_prof2 = st.columns(2)
 nome_responsavel = c_prof1.text_input("Responsável Técnico", placeholder="Ex: Eng. Pedro Santos")
-registro_tecnico = c_prof2.text_input("Registro Profissional (CREA / CFT)", placeholder="Ex: 506.XXX.XXX-SP")
+registro_tecnico = c_prof2.text_input("Registro Profissional (CREA / CFT)", placeholder="Ex: 506.XXX-SP")
 
 st.markdown("---")
 col_cadastro, col_projeto = st.columns([1.1, 1.4], gap="large")
@@ -87,7 +90,7 @@ col_cadastro, col_projeto = st.columns([1.1, 1.4], gap="large")
 with col_cadastro:
     st.markdown("### 📝 Cadastrar Novo Cômodo")
     nome_c = st.text_input("Nome do Cômodo", placeholder="Ex: Suite Master, Cozinha")
-    tipo_c = st.radio("Classificação do Ambiente", ["Área Seca (Quartos, Sala, Corredores)", "Área Úmida/Molhada (Cozinha, Banheiro, Area Serv.)"])
+    tipo_c = st.radio("Classificação do Ambiente", ["Área Seca", "Área Úmida/Molhada"])
     
     c1, c2, c3 = st.columns(3)
     larg_c = c1.number_input("Largura (m)", min_value=0.1, value=3.0, step=0.1)
@@ -107,7 +110,6 @@ with col_cadastro:
             st.session_state.tues_temporarias.append({"equipamento": nome_tue, "potencia": w_tue, "tensao": v_tue})
             st.toast(f"TUE '{nome_tue}' vinculada.")
             
-    # Gerenciador de Remoção de TUEs individuais
     if st.session_state.tues_temporarias:
         st.write("**TUEs vinculadas provisoriamente:**")
         tues_para_remover = []
@@ -236,12 +238,11 @@ with col_projeto:
                 with st.expander(f"📍 {co['nome'].upper()}"):
                     st.write(f"Area: {co['area']:.1f} m2 | Distancia: {co['distancia']}m")
                     
-                    # Gerenciador de TUEs dentro do cômodo já salvo
                     if co['tues']:
-                        st.write("Cargas Especiais (TUEs):")
+                        st.write("Cargas Especiais (TUEs) Ativas:")
                         tues_internas_para_remover = []
                         for t_idx, t in enumerate(co['tues']):
-                            t_col1, t_col2 = st.columns([5, 1])
+                            t_col1, t_col2 = st.columns([4, 1])
                             t_col1.write(f"🔸 {t['equipamento']} ({t['potencia']}W em {t['tensao']}V)")
                             if t_col2.button("🗑️", key=f"del_tue_salva_{idx}_{t_idx}"):
                                 tues_internas_para_remover.append(t_idx)
@@ -251,7 +252,6 @@ with col_projeto:
                                 co['tues'].pop(t_index)
                             st.rerun()
                     
-                    # Botão para excluir o cômodo inteiro
                     if st.button("Remover Comodo Completo", key=f"del_comodo_{idx}"):
                         comodo_remover = idx
             
@@ -270,7 +270,7 @@ with col_projeto:
                 """, unsafe_allow_html=True)
                 
         with mat_aba:
-            st.markdown("#### 🛒 Estimativa Quantitativa")
+            st.markdown("#### 🛒 Estimativa Quantitativa de Materiais")
             for amp, quant in resumo_disjuntores.items():
                 st.write(f"• Disjuntor {amp}A: **{quant} un.**")
             for bit, metros in resumo_cabos.items():
