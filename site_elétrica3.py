@@ -41,7 +41,9 @@ def gerar_pdf(cliente, obra, comodos, circuitos):
         pdf.set_font("Helvetica", "B", 10)
         pdf.cell(190, 6, f"Circuito {circ['numero']} - {circ['nome']} ({circ['tensao']}V)".encode('latin-1', 'ignore').decode('latin-1'), ln=True)
         pdf.set_font("Helvetica", "", 10)
-        pdf.cell(190, 5, f"  -> Potencia: {circ['potencia']:.0f} VA | Corrente: {circ['corrente']:.2f} A | Queda: {circ['queda']:.2f}%", ln=True)
+        # CORREÇÃO AQUI: Trocado 'queda' por 'queda_tensao' para bater com o resto do código
+        linha2 = f"  -> Potencia: {circ['potencia']:.0f} VA | Corrente: {circ['corrente']:.2f} A | Queda: {circ['queda_tensao']:.2f}%"
+        pdf.cell(190, 5, linha2, ln=True)
         pdf.cell(190, 5, f"  -> Condutor: {circ['bitola']} mm2 | Disjuntor: {circ['disjuntor']} A", ln=True)
         pdf.cell(190, 5, f"  -> DR: {circ['dr']} | DPS: Obrigatorio Classe II", ln=True)
         pdf.ln(1)
@@ -119,7 +121,6 @@ with col_projeto:
         circuitos = []
         c_num = 1
         
-        # Correção do loop usando tupla explícita de tensões
         for v in (127, 220):
             ilum_comodos = [c for c in st.session_state.comodos if c['tensao'] == v]
             if ilum_comodos:
@@ -130,7 +131,6 @@ with col_projeto:
                 })
                 c_num += 1
         
-        # Correção do loop de tomadas usando tupla explícita de tensões
         for v in (127, 220):
             umidas = [c for c in st.session_state.comodos if c['tensao'] == v and c['molhada']]
             for u in umidas:
@@ -186,7 +186,6 @@ with col_projeto:
                         circ['queda_tensao'] = pct
                         break
 
-            # Substituição para lista comercial pura de disjuntores DIN
             i_proj = circ['corrente']
             circ['disjuntor'] = 10 if i_proj <= 10 else 16 if i_proj <= 16 else 20 if i_proj <= 20 else 25 if i_proj <= 25 else 32 if i_proj <= 32 else 40
 
