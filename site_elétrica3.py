@@ -91,7 +91,7 @@ def gerar_word(cliente, obra, responsavel, registro, circuitos, padrao):
 st.markdown("""
     <div style="background-color: #111827; padding: 24px; border-radius: 12px; margin-bottom: 30px; text-align: center; border: 1px solid #1e3a8a;">
         <div style="font-size: 40px; margin-bottom: 5px; text-shadow: 0 0 12px #3b82f6;">⚡</div>
-        <h1 style="margin: 0; font-size: 28px; font-weight: 800; letter-spacing: 2.5px; color: #ffffff;">PRO ELÉTRICA <span style="color: #3b82f6;">PRO</span></h1>
+        <h1 style="margin: 0; font-size: 28px; font-weight: 800; letter-spacing: 2.5px; color: #ffffff;">RIBEIRO ELÉTRICA <span style="color: #3b82f6;">PRO</span></h1>
         <div style="width: 60px; height: 3px; background: linear-gradient(90deg, #1e3a8a, #3b82f6); margin: 12px auto; border-radius: 2px;"></div>
         <p style="margin: 0; color: #9ca3af; font-size: 13px; font-weight: 500; letter-spacing: 1px;">SISTEMA INTELIGENTE DE DIMENSIONAMENTO • NBR 5410</p>
     </div>
