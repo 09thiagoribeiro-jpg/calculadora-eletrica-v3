@@ -13,7 +13,7 @@ st.set_page_config(
 if "comodos" not in st.session_state:
     st.session_state.comodos = []
 
-# --- FUNÇÃO PARA GERAR O PDF CORRIGIDA (SEM ERRO DE UNICODE) ---
+# --- FUNÇÃO PARA GERAR O PDF (LATIN-1 COMPATÍVEL) ---
 def gerar_pdf(comodos, circuitos):
     pdf = FPDF()
     pdf.add_page()
@@ -58,10 +58,10 @@ def gerar_pdf(comodos, circuitos):
         pdf.cell(190, 5, linha4.encode('latin-1', 'ignore').decode('latin-1'), ln=True)
         pdf.ln(2)
         
-    return pdf.output(dest="S")
+    return pdf.output()
 
 # --- INTERFACE GRÁFICA (DASHBOARD) ---
-st.title("⚡ Gestor de Projetos Elétricos Residencias")
+st.title("⚡ Gestor de Projetos Elétricos Residenciais")
 st.caption("Cálculo de Cargas Mínimas, Dimensionamento e Divisão de Circuitos conforme NBR 5410")
 
 # Layout em duas colunas: Esquerda (Entrada) | Direita (Resultados do Projeto)
@@ -192,10 +192,12 @@ with col_projeto:
         st.markdown("#### 📂 Enviar Projeto para o Cliente")
         st.write("Clique no botão abaixo para gerar e fazer o download do documento técnico oficial em formato PDF.")
         
+        # Correção aqui: extraindo a string de dados bruta e convertendo em bytes puros
         dados_pdf = gerar_pdf(st.session_state.comodos, circuitos)
+        
         st.download_button(
             label="📥 BAIXAR LAUDO TÉCNICO (PDF)",
-            data=dados_pdf,
+            data=bytes(dados_pdf),
             file_name="laudo_dimensionamento_nbr5410.pdf",
             mime="application/pdf"
         )
