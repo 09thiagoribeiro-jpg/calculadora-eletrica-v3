@@ -49,7 +49,6 @@ def gerar_pdf(cliente, obra, comodos, circuitos):
 
 st.title("⚡ Gestor de Projetos Elétricos Avançado")
 st.caption("Otimização de Circuitos, Cálculo de Queda de Tensão e Laudos Técnicos NBR 5410")
-
 st.markdown("### 👤 Identificação do Projeto")
 c_cli1, c_cli2 = st.columns(2)
 nome_cliente = c_cli1.text_input("Nome do Cliente", placeholder="Ex: Joao Silva")
@@ -111,6 +110,7 @@ with col_cadastro:
         st.session_state.comodos = []
         st.session_state.tues_temporarias = []
         st.rerun()
+
 with col_projeto:
     st.markdown("### 📋 Quadro de Distribuição Otimizado (QGD)")
     if not st.session_state.comodos:
@@ -184,7 +184,13 @@ with col_projeto:
                         circ['queda_tensao'] = pct
                         break
 
-            circ['disjuntor'] = 10 if circ['corrente']<=10 else 16 if circ['corrente']<=16 else 20 if circ['corrente']<=20 else 25 if circ['corrente']<=25 else 32 if circ['corrente']<=32 else 40
+            # Lista comercial corrigida
+            disjuntores_comerciais = [10, 16, 20, 25, 32, 40]
+            circ['disjuntor'] = 40
+            for dj in disjuntores_comerciais:
+                if dj >= circ['corrente']:
+                    circ['disjuntor'] = dj
+                    break
 
         v_aba, d_aba = st.tabs(["🏠 Cômodos", "🗂️ Circuitos (QGD)"])
         with v_aba:
