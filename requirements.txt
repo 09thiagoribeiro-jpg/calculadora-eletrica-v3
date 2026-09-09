@@ -1,4 +1,4 @@
 streamlit
-streamlit
 fpdf2
+python-docx
 
