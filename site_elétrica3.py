@@ -68,7 +68,7 @@ def gerar_pdf(cliente, obra, responsavel, registro, comodos, circuitos):
 
 st.markdown("""
     <div style="background: linear-gradient(135deg, #1e3a8a, #3b82f6); padding: 20px; border-radius: 12px; margin-bottom: 25px; text-align: center; color: white;">
-        <h1 style="margin: 0; font-size: 32px;">⚡ PRO ELETRICA & ENGENHARIA</h1>
+        <h1 style="margin: 0; font-size: 32px;">⚡ RIBEIRO ELÉTRICA ⚡</h1>
         <p style="margin: 5px 0 0 0; opacity: 0.9; font-size: 14px;">Plataforma Homologada NBR 5410 - Gestão & Dimensionamento Avançado</p>
     </div>
 """, unsafe_allow_html=True)
