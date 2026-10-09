@@ -161,10 +161,33 @@ with col_cadastro:
     sugerir_suite = True if nome_c == "Suíte" else False
     possui_suite = st.checkbox("Este cômodo possui Banheiro Integrado (Configuração Suíte)?", value=sugerir_suite)
     
+    # --- NOVAS MEDIDAS PREDEFINIDAS COM OPÇÃO MANUAL ---
     c1, c2, c3 = st.columns(3)
-    larg_c = c1.number_input("Largura (m)", min_value=0.1, value=3.0, step=0.1, key="larg")
-    comp_c = c2.number_input("Comprimento (m)", min_value=0.1, value=4.0, step=0.1, key="comp")
-    dist_c = c3.number_input("Distância ao QGD (m)", min_value=1.0, value=15.0, step=1.0, key="dist")
+    
+    with c1:
+        opcoes_larg = ["1.5", "2.0", "2.5", "3.0", "3.5", "4.0", "5.0", "Outra (Digitar Manualmente)"]
+        sel_larg = st.selectbox("Largura Padrão (m):", opcoes_larg, index=3) # Padrão 3.0m
+        if sel_larg == "Outra (Digitar Manualmente)":
+            larg_c = st.number_input("Digite a Largura (m):", min_value=0.1, value=3.0, step=0.1, key="larg_manual")
+        else:
+            larg_c = float(sel_larg)
+            
+    with c2:
+        opcoes_comp = ["1.5", "2.0", "2.5", "3.0", "3.5", "4.0", "5.0", "Outra (Digitar Manualmente)"]
+        sel_comp = st.selectbox("Comprimento Padrão (m):", opcoes_comp, index=5) # Padrão 4.0m
+        if sel_comp == "Outra (Digitar Manualmente)":
+            comp_c = st.number_input("Digite o Comprimento (m):", min_value=0.1, value=4.0, step=0.1, key="comp_manual")
+        else:
+            comp_c = float(sel_comp)
+            
+    with c3:
+        opcoes_dist = ["5", "10", "15", "20", "25", "30", "Outra (Digitar Manualmente)"]
+        sel_dist = st.selectbox("Distância ao QGD (m):", opcoes_dist, index=2) # Padrão 15m
+        if sel_dist == "Outra (Digitar Manualmente)":
+            dist_c = st.number_input("Digite a Distância (m):", min_value=1.0, value=15.0, step=1.0, key="dist_manual")
+        else:
+            dist_c = float(sel_dist)
+
         
     tensao_c = st.selectbox("Tensão Base (Iluminação e TUGs)", (127, 220))
     agrup_c = st.number_input("Circuitos Agrupados no mesmo conduto", min_value=1, value=2, step=1)
