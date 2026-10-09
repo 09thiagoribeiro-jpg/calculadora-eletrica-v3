@@ -49,13 +49,13 @@ if arquivo_importado is not None:
         contagem = {}
         for c in dados_carregados:
             if 'nome' in c:
-                nome_puro = c['nome'].rsplit(' ', 1)[0]
+                partes_nome = c['nome'].rsplit(' ', 1)
+                nome_puro = partes_nome[0]
                 contagem[nome_puro] = contagem.get(nome_puro, 0) + 1
         st.session_state.comodos_contagem = contagem
         st.sidebar.success("Projeto carregado com sucesso!")
     except Exception as e:
         st.sidebar.error("Erro ao ler o arquivo JSON.")
-
 def gerar_pdf(cliente, obra, responsavel, registro, concessionaria, circuitos, padrao, inc_padrao):
     pdf = FPDF()
     pdf.add_page()
@@ -93,7 +93,9 @@ def gerar_pdf(cliente, obra, responsavel, registro, concessionaria, circuitos, p
         pdf.cell(190, 5, linha2, ln=True)
         pdf.cell(190, 5, f"  -> Condutor: {circ['bitola']} mm2 | Disjuntor DIN: {circ['disjuntor']} A | Queda de Tensao: {circ['queda_tensao']:.2f}% ({circ['dr']})", ln=True)
         pdf.ln(1)
-    return pdf.output(dest='S').encode('latin-1', 'ignore')
+    
+    # CORREÇÃO DEFINITIVA DO ERRO: Retorna os bytes do PDF gerados pela biblioteca fpdf2 atualizada
+    return pdf.output()
 
 def gerar_word(cliente, obra, responsavel, registro, concessionaria, circuitos, padrao, inc_padrao):
     doc = Document()
@@ -137,7 +139,6 @@ c_prof1, c_prof2 = st.columns(2)
 nome_responsavel = c_prof1.text_input("Responsável Técnico (Projetista)", placeholder="Ex: Eng. Pedro Santos")
 registro_tecnico = c_prof2.text_input("Registro Técnico (CREA / CFT)", placeholder="Ex: 506.XXX")
 
-# --- SELETOR DE ESTADO E ADEQUAÇÃO DE CONCESSIONÁRIA ---
 st.markdown("#### 🏢 Enquadramento Geográfico / Concessionária de Energia")
 estado_origem = st.selectbox(
     "Selecione o Estado da Obra para adequar o Padrão de Entrada:",
@@ -154,19 +155,18 @@ with col_cadastro:
     opcoes_comodos = ["Sala", "Sala de Estar", "Quarto", "Suíte", "Corredor", "Banheiro", "Cozinha", "Área de Serviço", "Garagem", "Escritório", "Varanda"]
     nome_c = st.selectbox("Selecione o Ambiente:", opcoes_comodos)
     
-    # Autoclassificação baseada nas diretrizes de áreas úmidas da NBR 5410
     idx_tipo = 1 if nome_c in ["Cozinha", "Área de Serviço", "Banheiro"] else 0
     tipo_c = st.radio("Classificação do Ambiente:", ["Área Seca", "Área Úmida/Molhada"], index=idx_tipo)
     
     sugerir_suite = True if nome_c == "Suíte" else False
     possui_suite = st.checkbox("Este cômodo possui Banheiro Integrado (Configuração Suíte)?", value=sugerir_suite)
     
-    # --- NOVAS MEDIDAS PREDEFINIDAS COM OPÇÃO MANUAL ---
+    # --- SISTEMA DE MEDIDAS PREDEFINIDAS + DIGITAÇÃO MANUAL ---
     c1, c2, c3 = st.columns(3)
     
     with c1:
         opcoes_larg = ["1.5", "2.0", "2.5", "3.0", "3.5", "4.0", "5.0", "Outra (Digitar Manualmente)"]
-        sel_larg = st.selectbox("Largura Padrão (m):", opcoes_larg, index=3) # Padrão 3.0m
+        sel_larg = st.selectbox("Largura Padrão (m):", opcoes_larg, index=3)
         if sel_larg == "Outra (Digitar Manualmente)":
             larg_c = st.number_input("Digite a Largura (m):", min_value=0.1, value=3.0, step=0.1, key="larg_manual")
         else:
@@ -174,7 +174,7 @@ with col_cadastro:
             
     with c2:
         opcoes_comp = ["1.5", "2.0", "2.5", "3.0", "3.5", "4.0", "5.0", "Outra (Digitar Manualmente)"]
-        sel_comp = st.selectbox("Comprimento Padrão (m):", opcoes_comp, index=5) # Padrão 4.0m
+        sel_comp = st.selectbox("Comprimento Padrão (m):", opcoes_comp, index=5)
         if sel_comp == "Outra (Digitar Manualmente)":
             comp_c = st.number_input("Digite o Comprimento (m):", min_value=0.1, value=4.0, step=0.1, key="comp_manual")
         else:
@@ -182,16 +182,14 @@ with col_cadastro:
             
     with c3:
         opcoes_dist = ["5", "10", "15", "20", "25", "30", "Outra (Digitar Manualmente)"]
-        sel_dist = st.selectbox("Distância ao QGD (m):", opcoes_dist, index=2) # Padrão 15m
+        sel_dist = st.selectbox("Distância ao QGD (m):", opcoes_dist, index=2)
         if sel_dist == "Outra (Digitar Manualmente)":
             dist_c = st.number_input("Digite a Distância (m):", min_value=1.0, value=15.0, step=1.0, key="dist_manual")
         else:
             dist_c = float(sel_dist)
-
         
     tensao_c = st.selectbox("Tensão Base (Iluminação e TUGs)", (127, 220))
     agrup_c = st.number_input("Circuitos Agrupados no mesmo conduto", min_value=1, value=2, step=1)
-    
     st.markdown("#### 🔌 Cargas Especiais / TUEs do Cômodo")
     equip_sugestao = st.selectbox(
         "Selecione a Carga Dedicada:",
@@ -208,7 +206,7 @@ with col_cadastro:
         fp_sugerido = 1.0  
         tensao_sugerida = 220
     elif equip_sugestao == "Ar Condicionado":
-        opcoes_potencia = [900, 1200, 1800, 2500]
+        opcoes_potencia = [900, 1200, 1600, 2200]
         fp_sugerido = 0.80  
         tensao_sugerida = 220
     elif equip_sugestao == "Lava e Seca":
@@ -311,7 +309,6 @@ with col_projeto:
         circuitos = []
         c_num = 1
         
-        # 1. Agrupamento Automático Normativo de Iluminação
         for v in (127, 220):
             ilum_comodos = [c for c in st.session_state.comodos if c['tensao'] == v]
             if ilum_comodos:
@@ -321,7 +318,6 @@ with col_projeto:
                 })
                 c_num += 1
         
-        # 2. Agrupamento de TUGs de Áreas Úmidas e Suítes
         for v in (127, 220):
             umidas = [c for c in st.session_state.comodos if c['tensao'] == v and c['molhada']]
             for u in umidas:
@@ -339,7 +335,6 @@ with col_projeto:
                 })
                 c_num += 1
             
-            # 3. Distribuição Combinada de TUGs Secas (Limite Técnico Normativo)
             secas = [c for c in st.session_state.comodos if c['tensao'] == v and not c['molhada'] and not c['is_suite']]
             for s in suites:
                 secas.append({"nome": f"Quarto {s['nome']}", "va_tugs": s['va_tugs'], "distancia": s['distancia'], "agrupados": s['agrupados']})
@@ -362,7 +357,6 @@ with col_projeto:
                 circuitos.append({"numero": c_num, "nome": f"TUGs Secas Agrupadas ({', '.join(c_nome)})", "potencia": c_va, "tensao": v, "tipo": "TUG", "dr": "RECOMENDADO", "distancia": c_dist, "agrupados": c_agrup})
                 c_num += 1
 
-        # 4. Isolamento das TUEs em Circuitos Exclusivos (Exigência NBR 5410)
         for c in st.session_state.comodos:
             for t in c['tues']:
                 circuitos.append({
@@ -371,7 +365,6 @@ with col_projeto:
                 })
                 c_num += 1
 
-        # --- MOTOR DE CÁLCULO DE DEMANDA SEGUNDO CONCESSIONÁRIAS ---
         pot_ilum_tug_w = sum(circ['potencia'] * 0.8 for circ in circuitos if circ['tipo'] != "TUE") 
         pot_tue_w = sum(circ.get('potencia_w', circ['potencia']) for circ in circuitos if circ['tipo'] == "TUE")
         
@@ -407,17 +400,14 @@ with col_projeto:
         resumo_disjuntores = {}
         resumo_cabos = {1.5: 0.0, 2.5: 0.0, 4.0: 0.0, 6.0: 0.0, 10.0: 0.0, 16.0: 0.0}
 
-        # --- PROCESSAMENTO INDIVIDUAL DE CADA CIRCUITO (NBR 5410) ---
         for circ in circuitos:
             circ['corrente'] = circ['potencia'] / circ['tensao']
-            
             f_agrup = 1.0 if circ['agrupados'] == 1 else 0.80 if circ['agrupados'] == 2 else 0.70 if circ['agrupados'] == 3 else 0.65
             b_final = 1.5 if circ['tipo'] == "ILUM" else 2.5 
             
             while True:
                 cap_base = 17.5 if b_final==1.5 else 24.0 if b_final==2.5 else 32.0 if b_final==4.0 else 41.0 if b_final==6.0 else 57.0 if b_final==10.0 else 76.0
                 cap_corrigida = cap_base * f_agrup
-                
                 q_v = (2.0 * 0.0178 * circ['distancia'] * circ['corrente']) / b_final
                 pct = (q_v / circ['tensao']) * 100.0
                 
@@ -436,7 +426,7 @@ with col_projeto:
                         break
 
             i_proj = circ['corrente']
-            disjuntores_din = [10, 16, 20, 25, 32, 40, 50, 63, 70, 80, 100]
+            disjuntores_din = [10, 16, 20, 25, 32, 40, 50, 63]
             dj_adequado = 10
             for d in disjuntores_din:
                 if d >= i_proj and d <= circ['iz_corrigida']:
@@ -499,7 +489,7 @@ with col_projeto:
         c_down1, c_down2 = st.columns(2)
         with c_down1:
             dados_pdf = gerar_pdf(nome_cliente, endereco_obra, nome_responsavel, registro_tecnico, estado_origem, circuitos, padrao, inclui_padrao_entrada)
-            st.download_button(label="📥 BAIXAR LAUDO TÉCNICO COMPLETO (PDF)", data=bytes(dados_pdf), file_name="laudo_tecnico_eletrico.pdf", mime="application/pdf")
+            st.download_button(label="📥 BAIXAR LAUDO TÉCNICO COMPLETO (PDF)", data=dados_pdf, file_name="laudo_tecnico_eletrico.pdf", mime="application/pdf")
         with c_down2:
             dados_word = gerar_word(nome_cliente, endereco_obra, nome_responsavel, registro_tecnico, estado_origem, circuitos, padrao, inclui_padrao_entrada)
             st.download_button(label="📝 BAIXAR MEMORIAL DESCRITIVO (WORD)", data=dados_word, file_name="memorial_eletrico.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
