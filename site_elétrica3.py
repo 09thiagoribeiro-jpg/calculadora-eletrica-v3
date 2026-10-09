@@ -56,7 +56,7 @@ if arquivo_importado is not None:
         st.sidebar.success("Projeto carregado com sucesso!")
     except Exception as e:
         st.sidebar.error("Erro ao ler o arquivo JSON.")
-def gerar_pdf(cliente, obra, responsavel, registro, concessionaria, circuitos, padrao, inc_padrao):
+def gerar_pdf(cliente, obra, responsavel, registro, concessionaria, circuitos, padrao, inc_padrao, protecao):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Helvetica", "B", 14)
@@ -81,6 +81,7 @@ def gerar_pdf(cliente, obra, responsavel, registro, concessionaria, circuitos, p
         pdf.set_font("Helvetica", "", 9)
         pdf.cell(190, 5, f"Tipo de Atendimento: {padrao['tipo']} | Demanda Calculada: {padrao['demanda_kva']:.2f} kVA", ln=True)
         pdf.cell(190, 5, f"Disjuntor Termomagnetico Geral: {padrao['disjuntor']} A | Condutor de Entrada: {padrao['cabo']} mm2", ln=True)
+        pdf.cell(190, 5, f"Dispositivos de Protecao do Quadro: {protecao['qtd_dps']}x DPS (Classe II 45kA) | 1x IDR Geral {protecao['idr_polos']} {protecao['idr_amperagem']}A", ln=True)
         pdf.ln(5)
     
     pdf.set_font("Helvetica", "B", 11)
@@ -93,11 +94,9 @@ def gerar_pdf(cliente, obra, responsavel, registro, concessionaria, circuitos, p
         pdf.cell(190, 5, linha2, ln=True)
         pdf.cell(190, 5, f"  -> Condutor: {circ['bitola']} mm2 | Disjuntor DIN: {circ['disjuntor']} A | Queda de Tensao: {circ['queda_tensao']:.2f}% ({circ['dr']})", ln=True)
         pdf.ln(1)
-    
-    # CORREÇÃO DEFINITIVA DO ERRO: Retorna os bytes do PDF gerados pela biblioteca fpdf2 atualizada
     return pdf.output()
 
-def gerar_word(cliente, obra, responsavel, registro, concessionaria, circuitos, padrao, inc_padrao):
+def gerar_word(cliente, obra, responsavel, registro, concessionaria, circuitos, padrao, inc_padrao, protecao):
     doc = Document()
     doc.add_heading("MEMORIAL DESCRITIVO E MEMÓRIA DE CÁLCULO ELÉTRICO", level=1)
     p = doc.add_paragraph()
@@ -105,11 +104,12 @@ def gerar_word(cliente, obra, responsavel, registro, concessionaria, circuitos, 
     p.add_run(f"Responsável Técnico: {responsavel} | Registro: {registro}\n")
     
     if inc_padrao:
-        doc.add_heading("1. Dimensionamento do Padrão de Entrada Geral (Concessionária)", level=2)
+        doc.add_heading("1. Dimensionamento do Padrão de Entrada e Elementos Gerais de Proteção", level=2)
         doc.add_paragraph(f"Tipo de Fornecimento Secundário: {padrao['tipo']}\n"
                           f"Demanda Máxima Diversificada: {padrao['demanda_kva']:.2f} kVA\n"
-                          f"Proteção Geral (Disjuntor Caixa): {padrao['disjuntor']} A\n"
-                          f"Seção Reta do Condutor de Entrada: {padrao['cabo']} mm²")
+                          f"Proteção Geral (Disjuntor Caixa): {padrao['disjuntor']} A | Condutor de Entrada: {padrao['cabo']} mm²\n"
+                          f"Supressores de Surto (DPS): {protecao['qtd_dps']} unidades Classe II (45kA / 275V)\n"
+                          f"Proteção Contra Choques (IDR Geral): 1 unidade {protecao['idr_polos']} de {protecao['idr_amperagem']}A - 30mA")
     
     doc.add_heading("2. Detalhamento dos Circuitos Terminais (QGD)", level=2)
     for circ in circuitos:
@@ -161,32 +161,21 @@ with col_cadastro:
     sugerir_suite = True if nome_c == "Suíte" else False
     possui_suite = st.checkbox("Este cômodo possui Banheiro Integrado (Configuração Suíte)?", value=sugerir_suite)
     
-    # --- SISTEMA DE MEDIDAS PREDEFINIDAS + DIGITAÇÃO MANUAL ---
     c1, c2, c3 = st.columns(3)
-    
     with c1:
         opcoes_larg = ["1.5", "2.0", "2.5", "3.0", "3.5", "4.0", "5.0", "Outra (Digitar Manualmente)"]
         sel_larg = st.selectbox("Largura Padrão (m):", opcoes_larg, index=3)
-        if sel_larg == "Outra (Digitar Manualmente)":
-            larg_c = st.number_input("Digite a Largura (m):", min_value=0.1, value=3.0, step=0.1, key="larg_manual")
-        else:
-            larg_c = float(sel_larg)
+        larg_c = st.number_input("Digite a Largura (m):", min_value=0.1, value=3.0, step=0.1, key="larg_manual") if sel_larg == "Outra (Digitar Manualmente)" else float(sel_larg)
             
     with c2:
         opcoes_comp = ["1.5", "2.0", "2.5", "3.0", "3.5", "4.0", "5.0", "Outra (Digitar Manualmente)"]
         sel_comp = st.selectbox("Comprimento Padrão (m):", opcoes_comp, index=5)
-        if sel_comp == "Outra (Digitar Manualmente)":
-            comp_c = st.number_input("Digite o Comprimento (m):", min_value=0.1, value=4.0, step=0.1, key="comp_manual")
-        else:
-            comp_c = float(sel_comp)
+        comp_c = st.number_input("Digite o Comprimento (m):", min_value=0.1, value=4.0, step=0.1, key="comp_manual") if sel_comp == "Outra (Digitar Manualmente)" else float(sel_comp)
             
     with c3:
         opcoes_dist = ["5", "10", "15", "20", "25", "30", "Outra (Digitar Manualmente)"]
         sel_dist = st.selectbox("Distância ao QGD (m):", opcoes_dist, index=2)
-        if sel_dist == "Outra (Digitar Manualmente)":
-            dist_c = st.number_input("Digite a Distância (m):", min_value=1.0, value=15.0, step=1.0, key="dist_manual")
-        else:
-            dist_c = float(sel_dist)
+        dist_c = st.number_input("Digite a Distância (m):", min_value=1.0, value=15.0, step=1.0, key="dist_manual") if sel_dist == "Outra (Digitar Manualmente)" else float(sel_dist)
         
     tensao_c = st.selectbox("Tensão Base (Iluminação e TUGs)", (127, 220))
     agrup_c = st.number_input("Circuitos Agrupados no mesmo conduto", min_value=1, value=2, step=1)
@@ -393,10 +382,13 @@ with col_projeto:
 
         if demanda_kva <= lim_mono:
             padrao = {"tipo": "Monofásico", "disjuntor": 40, "cabo": 10.0, "demanda_kva": demanda_kva}
+            config_protecao = {"qtd_dps": 2, "dps_v": "275V", "idr_polos": "Bipolar (Fase + Neutro)", "idr_amperagem": 40}
         elif demanda_kva <= lim_bi:
             padrao = {"tipo": "Bifásico", "disjuntor": 50, "cabo": 16.0, "demanda_kva": demanda_kva}
+            config_protecao = {"qtd_dps": 3, "dps_v": "275V", "idr_polos": "Tetrapolar", "idr_amperagem": 63}
         else:
             padrao = {"tipo": "Trifásico", "disjuntor": 63, "cabo": 25.0, "demanda_kva": demanda_kva}
+            config_protecao = {"qtd_dps": 4, "dps_v": "275V", "idr_polos": "Tetrapolar", "idr_amperagem": 63}
         resumo_disjuntores = {}
         resumo_cabos = {1.5: 0.0, 2.5: 0.0, 4.0: 0.0, 6.0: 0.0, 10.0: 0.0, 16.0: 0.0}
 
@@ -462,6 +454,7 @@ with col_projeto:
                 st.markdown(f"#### 🏢 Entrada Geral Recomendada: **{padrao['tipo']}**")
                 st.markdown(f"**Demanda Projetada:** {padrao['demanda_kva']:.2f} kVA | **Disjuntor Geral:** {padrao['disjuntor']}A | **Cabo Principal:** {padrao['cabo']} mm²")
                 st.caption(f"Cálculo executado com as curvas de simultaneidade exigidas para a região da {estado_origem}.")
+                st.info(f"🔰 **Proteção do Quadro:** Recomenda-se a instalação de {config_protecao['qtd_dps']} peças de DPS (45kA) e 1 IDR Geral {config_protecao['idr_polos']} de {config_protecao['idr_amperagem']}A para proteção contra choques e surtos elétricos.")
                 st.markdown("---")
             
             for circ in circuitos:
@@ -478,20 +471,27 @@ with col_projeto:
             if inclui_padrao_entrada:
                 st.write(f"• Condutor de Cobre de Entrada Geral ({padrao['cabo']} mm²): **15.0 metros**")
                 st.write(f"• Disjuntor Caixa Moldada / DIN Geral {padrao['disjuntor']}A: **1 un.**")
+            
+            st.markdown("##### 🛡️ Dispositivos de Proteção Geral (QGD)")
+            st.write(f"• Dispositivo de Proteção contra Surtos (DPS) Classe II - 45kA / {config_protecao['dps_v']}: **{config_protecao['qtd_dps']} un.**")
+            st.write(f"• Interruptor Diferencial Residual (IDR) Geral {config_protecao['idr_polos']} - 30mA / {config_protecao['idr_amperagem']}A: **1 un.**")
+            
+            st.markdown("##### 🔌 Disjuntores dos Circuitos")
             for amp, quant in sorted(resumo_disjuntores.items()):
                 st.write(f"• Disjuntor Termomagnético Monopolar DIN {amp}A: **{quant} un.**")
+                
+            st.markdown("##### 🪢 Condutores Elétricos")
             for bit, metros in sorted(resumo_cabos.items()):
                 if metros > 0:
                     st.write(f"• Cabo Flexível Isolado {bit} mm² (Fase/Neutro/Terra Acumulados): **{metros:.1f} metros**")
 
-            # --- BLOCO DE EXPORTAÇÃO SEGURO COM VALIDAÇÃO DE DADOS ---
         if st.session_state.comodos:
             st.markdown("---")
             st.markdown("#### 📂 Emissão de Relatórios Oficiais")
             c_down1, c_down2 = st.columns(2)
             
             try:
-                dados_pdf = gerar_pdf(nome_cliente, endereco_obra, nome_responsavel, registro_tecnico, estado_origem, circuitos, padrao, inclui_padrao_entrada)
+                dados_pdf = gerar_pdf(nome_cliente, endereco_obra, nome_responsavel, registro_tecnico, estado_origem, circuitos, padrao, inclui_padrao_entrada, config_protecao)
                 with c_down1:
                     st.download_button(label="📥 BAIXAR LAUDO TÉCNICO COMPLETO (PDF)", data=dados_pdf, file_name="laudo_tecnico_eletrico.pdf", mime="application/pdf")
             except Exception as e:
@@ -499,7 +499,7 @@ with col_projeto:
                     st.warning("Adicione dados completos para liberar o download do PDF.")
                     
             try:
-                dados_word = gerar_word(nome_cliente, endereco_obra, nome_responsavel, registro_tecnico, estado_origem, circuitos, padrao, inclui_padrao_entrada)
+                dados_word = gerar_word(nome_cliente, endereco_obra, nome_responsavel, registro_tecnico, estado_origem, circuitos, padrao, inclui_padrao_entrada, config_protecao)
                 with c_down2:
                     st.download_button(label="📝 BAIXAR MEMORIAL DESCRITIVO (WORD)", data=dados_word, file_name="memorial_eletrico.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
             except Exception as e:
