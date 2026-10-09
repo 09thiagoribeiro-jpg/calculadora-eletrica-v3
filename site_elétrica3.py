@@ -484,12 +484,24 @@ with col_projeto:
                 if metros > 0:
                     st.write(f"• Cabo Flexível Isolado {bit} mm² (Fase/Neutro/Terra Acumulados): **{metros:.1f} metros**")
 
-        st.markdown("---")
-        st.markdown("#### 📂 Emissão de Relatórios Oficiais")
-        c_down1, c_down2 = st.columns(2)
-        with c_down1:
-            dados_pdf = gerar_pdf(nome_cliente, endereco_obra, nome_responsavel, registro_tecnico, estado_origem, circuitos, padrao, inclui_padrao_entrada)
-            st.download_button(label="📥 BAIXAR LAUDO TÉCNICO COMPLETO (PDF)", data=dados_pdf, file_name="laudo_tecnico_eletrico.pdf", mime="application/pdf")
-        with c_down2:
-            dados_word = gerar_word(nome_cliente, endereco_obra, nome_responsavel, registro_tecnico, estado_origem, circuitos, padrao, inclui_padrao_entrada)
-            st.download_button(label="📝 BAIXAR MEMORIAL DESCRITIVO (WORD)", data=dados_word, file_name="memorial_eletrico.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+            # --- BLOCO DE EXPORTAÇÃO SEGURO COM VALIDAÇÃO DE DADOS ---
+        if st.session_state.comodos:
+            st.markdown("---")
+            st.markdown("#### 📂 Emissão de Relatórios Oficiais")
+            c_down1, c_down2 = st.columns(2)
+            
+            try:
+                dados_pdf = gerar_pdf(nome_cliente, endereco_obra, nome_responsavel, registro_tecnico, estado_origem, circuitos, padrao, inclui_padrao_entrada)
+                with c_down1:
+                    st.download_button(label="📥 BAIXAR LAUDO TÉCNICO COMPLETO (PDF)", data=dados_pdf, file_name="laudo_tecnico_eletrico.pdf", mime="application/pdf")
+            except Exception as e:
+                with c_down1:
+                    st.warning("Adicione dados completos para liberar o download do PDF.")
+                    
+            try:
+                dados_word = gerar_word(nome_cliente, endereco_obra, nome_responsavel, registro_tecnico, estado_origem, circuitos, padrao, inclui_padrao_entrada)
+                with c_down2:
+                    st.download_button(label="📝 BAIXAR MEMORIAL DESCRITIVO (WORD)", data=dados_word, file_name="memorial_eletrico.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+            except Exception as e:
+                with c_down2:
+                    st.warning("Adicione dados completos para liberar o download do Word.")
