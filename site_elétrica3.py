@@ -86,7 +86,6 @@ def gerar_word(cliente, obra, responsavel, registro, circuitos, padrao, inc_padr
     target = BytesIO()
     doc.save(target)
     return target.getvalue()
-
 st.markdown("""
     <div style="background-color: #111827; padding: 24px; border-radius: 12px; margin-bottom: 30px; text-align: center; border: 1px solid #1e3a8a;">
         <div style="font-size: 40px; margin-bottom: 5px; text-shadow: 0 0 12px #3b82f6;">⚡</div>
@@ -95,6 +94,7 @@ st.markdown("""
         <p style="margin: 0; color: #9ca3af; font-size: 13px; font-weight: 500; letter-spacing: 1px;">SISTEMA INTELIGENTE DE DIMENSIONAMENTO • NBR 5410</p>
     </div>
 """, unsafe_allow_html=True)
+
 st.markdown("### 👤 Identificação Profissional e do Cliente")
 c_cli1, c_cli2 = st.columns(2)
 nome_cliente = c_cli1.text_input("Nome do Cliente", placeholder="Ex: Joao Silva")
@@ -105,16 +105,36 @@ nome_responsavel = c_prof1.text_input("Responsável Técnico", placeholder="Ex: 
 registro_tecnico = c_prof2.text_input("Registro Profissional (CREA / CFT)", placeholder="Ex: 506.XXX-SP")
 
 st.markdown("#### 🛠️ Escopo do Serviço Contratado")
-inclui_padrao_entrada = st.checkbox("Incluir dimensionamento e fornecimento do Padrão de Entrada (Caixa de Medição)", value=True)
+inclui_padrao_entrada = st.checkbox("Include dimensionamento e fornecimento do Padrão de Entrada (Caixa de Medição)", value=True)
 
 st.markdown("---")
 col_cadastro, col_projeto = st.columns([1.1, 1.4], gap="large")
 
 with col_cadastro:
     st.markdown("### 📝 Cadastrar Novo Cômodo")
-    nome_c = st.text_input("Nome do Cômodo", placeholder="Ex: Suite Master, Cozinha, Sala")
-    tipo_c = st.radio("Classificação Base do Ambiente", ["Área Seca (Quartos, Sala)", "Área Úmida/Molhada (Cozinha, Área de Serviço)"])
-    possui_suite = st.checkbox("Este cômodo possui um Banheiro Integrado (Suíte)?", value=False)
+    
+    # --- LISTA SELECIONÁVEL DE CÔMODOS ---
+    opcoes_comodos = [
+        "Sala", "Sala de Estar", "Quarto", "Suíte", 
+        "Corredor", "Banheiro", "Cozinha", 
+        "Área de Serviço", "Garagem", "Escritório", "Varanda"
+    ]
+    nome_c = st.selectbox("Escolha o Cômodo:", opcoes_comodos)
+    
+    # Automatiza a classificação do tipo de ambiente com base na seleção
+    idx_tipo = 0
+    if nome_c in ["Cozinha", "Área de Serviço", "Banheiro"]:
+        idx_tipo = 1
+        
+    tipo_c = st.radio(
+        "Classificação Base do Ambiente", 
+        ["Área Seca (Quartos, Sala)", "Área Úmida/Molhada (Cozinha, Área de Serviço)"],
+        index=idx_tipo
+    )
+    
+    # Força ou sugere a marcação de suíte/banheiro integrado de forma lógica
+    sugerir_suite = True if nome_c == "Suíte" else False
+    possui_suite = st.checkbox("Este cômodo possui um Banheiro Integrado (Suíte)?", value=sugerir_suite)
     
     c1, c2, c3 = st.columns(3)
     larg_c = c1.number_input("Largura (m)", min_value=0.1, value=3.0, step=0.1)
@@ -124,7 +144,6 @@ with col_cadastro:
     tensao_c = st.selectbox("Tensão da Iluminação e Tomadas Gerais (TUGs)", (127, 220))
     agrup_c = st.number_input("Circuitos Agrupados no Eletroduto", min_value=1, value=2, step=1)
     
-    # --- NOVO BANCO DE DADOS DE TUES TÍPICAS ---
     st.markdown("#### 🔌 Cargas Especiais / TUEs do Cômodo")
     
     equip_sugestao = st.selectbox(
@@ -141,7 +160,6 @@ with col_cadastro:
         ]
     )
     
-    # Define as potências e tensões comerciais com base na seleção
     opcoes_potencia = [0]
     tensao_sugerida = 220
     mostrar_manual = False
@@ -150,7 +168,7 @@ with col_cadastro:
         opcoes_potencia = [4400, 5500, 6800, 7500]
         tensao_sugerida = 220
     elif equip_sugestao == "Ar Condicionado":
-        opcoes_potencia = [900, 1200, 1600, 2200] # Equivalentes aproximados em W para 9k, 12k, 18k e 24k BTUs
+        opcoes_potencia = [900, 1200, 1600, 2200]
         tensao_sugerida = 220
     elif equip_sugestao == "Lava e Seca":
         opcoes_potencia = [2000, 2500, 3000]
@@ -232,12 +250,18 @@ with col_cadastro:
                 "is_suite": possui_suite, "va_banheiro": va_tugs_banheiro,
                 "tues": list(st.session_state.tues_temporarias)
             })
+            st.session_state.comodos_contagem = st.session_state.get("comodos_contagem", {})
+            st.session_state.comodos_contagem[nome_c] = st.session_state.comodos_contagem.get(nome_c, 0) + 1
+            # Garante nomes únicos caso salve o mesmo tipo de cômodo múltiplas vezes
+            st.session_state.comodos[-1]["nome"] = f"{nome_c} {st.session_state.comodos_contagem[nome_c]}"
+            
             st.session_state.tues_temporarias = []
             st.rerun()
 
     if st.button("🗑️ Limpar Todo o Projeto"):
         st.session_state.comodos = []
         st.session_state.tues_temporarias = []
+        st.session_state.comodos_contagem = {}
         st.rerun()
 with col_projeto:
     st.markdown("### 📋 Quadro de Distribuição Otimizado")
